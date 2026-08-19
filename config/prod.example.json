@@ -1,0 +1,12 @@
+{
+  "APP_NAME": "GIS Cẩm Phả",
+  "APP_VERSION": "1.0.0",
+  "API_BASE_URL": "https://apicampha.tourismpj.pro.vn/api/v1",
+  "GEOSERVER_URL": "https://maps.example.invalid/geoserver",
+  "GOOGLE_CLIENT_ID": "replace-with-production-client-id.apps.googleusercontent.com",
+  "MAPBOX_TOKEN": "pk.replace-with-production-public-token",
+  "WS_NOTIFICATIONS_URL": "wss://api.example.invalid/notifications",
+  "API_TIMEOUT_SECONDS": "30",
+  "GPS_ACCURACY_THRESHOLD_M": "10",
+  "VERBOSE_LOGGING": "false"
+}

@@ -1,0 +1,82 @@
+﻿[
+    {
+        "Name":  "Layer catalog",
+        "Method":  "GET",
+        "Path":  "/web-map/layers",
+        "Status":  200,
+        "Bytes":  388,
+        "Type":  "application/json; charset=utf-8"
+    },
+    {
+        "Name":  "Basemap catalog",
+        "Method":  "GET",
+        "Path":  "/web-map/basemaps",
+        "Status":  200,
+        "Bytes":  287,
+        "Type":  "application/json; charset=utf-8"
+    },
+    {
+        "Name":  "Layer legend",
+        "Method":  "GET",
+        "Path":  "/web-map/layers/1/legend",
+        "Status":  200,
+        "Bytes":  218,
+        "Type":  "application/json; charset=utf-8"
+    },
+    {
+        "Name":  "Feature search",
+        "Method":  "GET",
+        "Path":  "/web-map/features/search?q=Cẩm%20Phả",
+        "Status":  200,
+        "Bytes":  275,
+        "Type":  "application/json; charset=utf-8"
+    },
+    {
+        "Name":  "MVT boundary",
+        "Method":  "GET",
+        "Path":  "/mobile/layers/1/tiles/12/3269/1803.mvt",
+        "Status":  200,
+        "Bytes":  1856,
+        "Type":  "application/vnd.mapbox-vector-tile"
+    },
+    {
+        "Name":  "Weather",
+        "Method":  "GET",
+        "Path":  "/mobile/weather/current?latitude=21.01\u0026longitude=107.32",
+        "Status":  200,
+        "Bytes":  248,
+        "Type":  "application/json; charset=utf-8"
+    },
+    {
+        "Name":  "News",
+        "Method":  "GET",
+        "Path":  "/cms/news",
+        "Status":  200,
+        "Bytes":  2635,
+        "Type":  "application/json; charset=utf-8"
+    },
+    {
+        "Name":  "Documents",
+        "Method":  "GET",
+        "Path":  "/cms/documents",
+        "Status":  200,
+        "Bytes":  3410,
+        "Type":  "application/json; charset=utf-8"
+    },
+    {
+        "Name":  "PDF maps",
+        "Method":  "GET",
+        "Path":  "/cms/pdf-maps",
+        "Status":  200,
+        "Bytes":  3361,
+        "Type":  "application/json; charset=utf-8"
+    },
+    {
+        "Name":  "Public reports",
+        "Method":  "GET",
+        "Path":  "/field-reports/public",
+        "Status":  200,
+        "Bytes":  157,
+        "Type":  "application/json; charset=utf-8"
+    }
+]

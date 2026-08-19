@@ -1,0 +1,50 @@
+# Risk Register — Mobile GIS Cẩm Phả
+
+Scale: Probability (P) and Impact (I): Low / Medium / High. Owner is accountable role, not necessarily code author.
+
+| ID | Risk | P | I | Owner | Mitigation / Prevention | Trigger / Contingency | Status |
+|---|---|---:|---:|---|---|---|---|
+| R-01 | MVT layer 1 returns 500 because metadata selects missing `source_fid` | High | High | Backend GIS | Validate catalog `id_field` against imported table; add acceptance tile test | Any target tile non-200: block MOB-303, show basemap-only POC, no mock sign-off | Open/blocking |
+| R-02 | Mapbox terms/cost/token policy unsuitable at release scale | Medium | High | PO/Ops/Legal | Review MAU, offline/caching and token restrictions before Sprint 3 commitment | Terms/cost rejected: revisit vendor-free renderer with new ADR and version-compatible packages | Open |
+| R-03 | Mapbox 2.28 raises iOS floor 13→14, excluding older devices | Medium | Medium | PO | Record product/device analytics if available; accepted platform baseline | iOS 13 support mandatory: renderer decision must reopen before production map code | Accepted |
+| R-04 | JWT sent to third-party map resources | Low | High | Mobile/Security | `setCustomHeadersForHost` exact API host; tests/resource inspection; clear on logout | Header seen on Mapbox/style/sprite host: release stop, rotate exposed credentials | Mitigated/design |
+| R-05 | `.env` bundled as asset mistaken for secret store | Low | High | Mobile/Ops | `.env` removed from assets/runtime; compile-time dart defines only; artifact scan requires zero `.env` entries | JWT/password/server key found: remove, rotate, invalidate build | Mitigated code; recurring artifact audit |
+| R-06 | Android emulator cannot reach `localhost:3006`; cleartext blocked | High | Medium | Mobile | Dev-only cleartext manifest; use adb reverse/10.0.2.2/LAN; keep prod HTTPS | Dev request timeout: verify host/reverse before debugging API code | Mitigated |
+| R-07 | iOS cannot be runtime-tested on Windows | High | High | QA/Ops | macOS CI/simulator/physical device gate before RC; keep platform config documented | No macOS evidence by Sprint 7: RC not signed for iOS | Open |
+| R-08 | Acceptance account password unavailable | High | High | PO/QA | Runtime secret or user-entered credential; never store in repo/evidence | Authenticated smoke blocked: mark Not Done, continue public checks only | Open |
+| R-09 | Static role assumptions overgrant admin/agency actions | Medium | High | Mobile/Security | Runtime permission + explicit backend role conditions; deny unknown; 403 revalidation | Matrix differs from `/me`: server wins; update docs/tests | Open recurring |
+| R-10 | Duplicate token storage causes missing auth or stale logout | Low | High | Mobile | Single `TokenStorage`; idempotent clear listener; session termination owns token/private cleanup; regression proves duplicate clear/delete behavior | Any repository direct secure storage or retained owner state: block auth story DoD | Mitigated Release Closure; authenticated runtime audit open |
+| R-11 | Backend error stack exposed in development response appears in UI/log | Medium | High | Backend/Mobile | Typed localized UI errors; unknown objects become generic copy; network logs metadata-only | Stack observed in Crashlytics/UI: scrub and stop release evidence | Mitigated Sprint 7; runtime audit recurring |
+| R-12 | Precise GPS/photo/phone leaks through logging, analytics or screenshots | Medium | High | Mobile/QA/Security | HTTP/query/body/response removed from logs; push/location/crash fallback fixed-code only; scrub evidence | PII detected: delete evidence, rotate/revoke if credential, privacy incident review | Mitigated code; manual evidence audit open |
+| R-13 | Photo upload succeeds but report create fails, leaving orphan object | Medium | Medium | Backend/Mobile | Committed IDs retained in in-memory retry state; form/media stay local; server cleanup policy still required | Create permanently fails: offer retry/remove; reconcile orphan policy with backend | Mitigated/mobile; backend cleanup open |
+| R-14 | Offline queue duplicates write or silently overwrites conflict | Medium | High | Mobile/Backend | UUID v4 client/change; server receipts/advisory lock; owner-scoped deterministic states; network-only bounded retry; no force | Duplicate/ambiguous sync: stop retry, retain local item for review; run TNMT conflict fixture before RC | Mitigated Sprint 6; runtime UAT open |
+| R-15 | Presigned URL expires during viewing/download | Medium | Low | Mobile | Request on action; no persisted grant; preflight 5-second margin; re-request at most once; identity guard before handoff | Grant still expired after refresh: actionable error; downstream external-viewer 401/403 requires authenticated runtime evidence | Mitigated Release Closure; runtime UAT open |
+| R-16 | System PDF/file app missing or unsupported | Medium | Medium | Mobile/PO | Use installed system viewer first; clear fallback/share/download | UAT requires in-app PDF: add minimal compatible viewer via ADR | Deferred |
+| R-17 | Firebase flavor files absent; push/crash evidence unavailable | High | Medium | Ops/Mobile | Optional init/no-crash path and device lifecycle wired; secure config delivery per flavor still required | Config absent Sprint 7: push/crash runtime stays Blocked | Open/blocking runtime |
+| R-18 | Map/list/image/PDF memory or frame issues on mid-range Android | Medium | High | Mobile/QA | Persistent MapWidget, lazy pages, display-sized image decode, local fonts, nonblocking optional Firebase init; emulator profile captured p50/p90/p99 and memory | Sustained physical jank/memory spike: profile five-image/main-isolate processing, use `Isolate.run` only with evidence; block RC | Emulator mitigated/observed; physical profiling open |
+| R-26 | Seed acceptance password remains valid after prior source/APK exposure | High | High | Backend/QA/Security | Mobile literal removed; debug picker has no fallback; rotate backend seed and invalidate old APKs | Any old credential still authenticates: rotate immediately, audit fixture distribution | Open/blocking rotation |
+| R-27 | Debug APK appears/distributes excessively large | High | Low | Mobile/QA | Use `--split-per-abi`; Android ARM64 split measured 114.01 MiB; production uses AAB; removed unused 16.11 MiB Material Symbols | Universal debug shared as release evidence: discard and rebuild correct ABI/mode | Mitigated/process |
+| R-28 | Restored local media path can escape managed folder if preferences are tampered | Low | High | Mobile/Security | App-generated paths currently live under app support; backup disabled and logout cleanup enforced | Hostile local tamper enters threat model: add canonical path-containment guard and regression before RC | Open/residual |
+| R-29 | `flutter_secure_storage` 9.x carries discontinued macOS implementation | Medium | Medium | Mobile | Plan isolated current-major upgrade; rerun token persistence/logout regressions on Android/iOS/macOS | Platform build warning/failure or secure-store regression: block release for affected platform | Open/dependency debt |
+| R-19 | Generated visual concept contains inaccurate controls/text and is copied literally | Medium | Medium | Design/Mobile | Treat as hierarchy direction only; Screen Spec/design tokens and real component tests win | Conflict found: production spec/accessibility wins, update direction note | Mitigated |
+| R-20 | Docs ignored/not versioned | High | Medium | Mobile | Removed `/docs` from `.gitignore`; verify at real repository root when available | Project remains outside Git: handoff must copy docs with source | Mitigated/local |
+| R-21 | Routing fixture has only point layer/network not ready | High | High | Backend GIS | Provision published line layer + ready topology + evidence | Missing entry gate: move MOB-405, no Mapbox Directions substitute | Open |
+| R-22 | Location/camera permission copy or request timing harms trust | Medium | High | Product/Design/Mobile | Point-of-use permission; no background location; iOS purpose copy; Android camera already scoped | Store review/user test flags copy: revise before RC | Mitigated/code; UAT open |
+| R-23 | Camera JPEG rejected by PNG/WebP-only backend or picker cache disappears | High | High | Mobile | Decode/re-encode PNG without metadata; resize; persist app-support path before form save | Decode/10 MB failure: keep form, explain invalid media, allow replace | Mitigated Sprint 5 |
+| R-24 | Retained provider/widget state leaks private content or exact GPS across logout/account switch | Low | High | Mobile/Security | Best-effort centralized owner cleanup; identity-watched list/detail/search providers; draft restore generation guard; token clear callback | Any A→B data/GPS visible: release stop, purge local data, add exact flow regression | Mitigated code; authenticated A→B UAT open |
+| R-25 | Production artifacts approved from dev-only evidence without signing/Firebase/HTTPS/device/iOS gates | High | High | PO/Ops/QA | Release Closure explicitly separates code PASS from production RC; require named owner evidence/waiver for every gate | Missing credential/config/signing/physical Android/macOS/approval: production RC remains Not Done | Open/blocking |
+
+## Top Sprint 0 Escalations
+
+1. **R-25 production evidence gates** block production RC despite clean code/build gates.
+2. **R-26 credential rotation** required because old seed credential/artifacts crossed source boundary.
+3. **R-08 acceptance secret** blocks authenticated evidence and A→B privacy UAT.
+4. **R-02 Mapbox commercial review** must close before release commitment.
+5. **R-07 iOS test infrastructure** needs macOS scheduling before production RC.
+
+## Review Cadence
+
+- Daily: new blocker/change in trigger.
+- Sprint refinement: update P/I/owner and dependent stories.
+- Sprint Review: close only with evidence link; accepted risk needs named decision.
+- Release gate: no open High-impact risk without PO/security/ops waiver and contingency.

@@ -1,0 +1,30 @@
+﻿[
+  {
+    "name": "Nearby boundary",
+    "method": "GET",
+    "path": "/mobile/layers/1/nearby?longitude=107.32&latitude=21.01&radiusMeters=2000&limit=20",
+    "status": 200,
+    "evidence": "feature_id=1; distance_m=1245.26; Point=[107.303749,21.002361]"
+  },
+  {
+    "name": "Measure line",
+    "method": "POST",
+    "path": "/mobile/measure",
+    "status": 200,
+    "evidence": "geometry_type=LINESTRING; length_m=1177.73"
+  },
+  {
+    "name": "Measure polygon",
+    "method": "POST",
+    "path": "/mobile/measure",
+    "status": 200,
+    "evidence": "geometry_type=POLYGON; area_m2=1150834.32"
+  },
+  {
+    "name": "Route non-network layer",
+    "method": "POST",
+    "path": "/mobile/routes/shortest",
+    "status": 409,
+    "evidence": "ROUTING_NETWORK_NOT_READY"
+  }
+]
