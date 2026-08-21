@@ -44,6 +44,7 @@ class ApiEndpoints {
   static String webMapLayerLegend(String layerId) =>
       '/web-map/layers/$layerId/legend';
   static const webMapBasemaps = '/web-map/basemaps';
+  static const floodScenarios = '/flood/scenarios';
   static String mapLayerTileTicket(String layerId) =>
       '/maps/layers/$layerId/tile-ticket';
   static String mobileTile(String layerId, int z, int x, int y) =>

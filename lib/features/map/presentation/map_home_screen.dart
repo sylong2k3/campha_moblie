@@ -23,6 +23,7 @@ import '../data/map_repository.dart';
 import '../domain/layer_model.dart';
 import '../domain/map_controller.dart';
 import 'basemap_selection_sheet.dart';
+import 'flood_scenario_sheet.dart';
 import 'layer_catalog_sheet.dart';
 import 'legend_card_widget.dart';
 
@@ -863,6 +864,15 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     );
   }
 
+  Future<void> _openFloodScenarios() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => const FloodScenarioSheet(),
+    );
+  }
+
   Future<void> _openBasemapSelector() async {
     await showModalBottomSheet<void>(
       context: context,
@@ -933,6 +943,14 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
               ),
               Text(context.l10n.fieldToolsSubtitle),
               const SizedBox(height: 14),
+              _ToolTile(
+                icon: Icons.water_damage_outlined,
+                title: 'Kịch bản ngập úng',
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _openFloodScenarios();
+                },
+              ),
               _ToolTile(
                 icon: Icons.location_on_outlined,
                 title: context.l10n.locationWeatherTitle,
@@ -1122,6 +1140,13 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
                               icon: Icons.map_outlined,
                               tooltip: context.l10n.mapBasemapTitle,
                               onTap: _openBasemapSelector,
+                            ),
+                            const SizedBox(height: 9),
+                            _MapControl(
+                              key: const ValueKey('map-flood-scenarios-open'),
+                              icon: Icons.water_damage_outlined,
+                              tooltip: 'Kịch bản ngập úng',
+                              onTap: _openFloodScenarios,
                             ),
                             const SizedBox(height: 9),
                             _MapControl(

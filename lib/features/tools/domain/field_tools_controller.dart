@@ -168,9 +168,7 @@ class FieldToolsController extends Notifier<FieldToolsState> {
       );
       final coordinate = GeoCoordinate(position.longitude, position.latitude);
       state = state.copyWith(
-        locationStatus: coordinate.isInCamPhaBounds
-            ? LocationStatus.ready
-            : LocationStatus.outsideBounds,
+        locationStatus: LocationStatus.ready,
         location: coordinate,
         accuracyMeters: position.accuracy,
         locationTime: position.timestamp,
@@ -187,7 +185,7 @@ class FieldToolsController extends Notifier<FieldToolsState> {
 
   Future<void> loadWeatherAndNearby(String? layerId) async {
     final coordinate = state.location;
-    if (coordinate == null || !coordinate.isInCamPhaBounds) return;
+    if (coordinate == null) return;
     state = state.copyWith(loading: true, clearError: true);
     try {
       final repository = ref.read(toolsRepositoryProvider);

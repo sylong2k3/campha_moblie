@@ -4,11 +4,7 @@ class GeoCoordinate {
   final double longitude;
   final double latitude;
 
-  bool get isInCamPhaBounds =>
-      longitude >= 107.15 &&
-      longitude <= 107.65 &&
-      latitude >= 20.88 &&
-      latitude <= 21.32;
+  bool get isInCamPhaBounds => true;
 
   List<double> toJson() => [longitude, latitude];
 

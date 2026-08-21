@@ -9,6 +9,7 @@ import '../../../core/network/api_config.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/network/dio_client.dart';
 import '../domain/feature_detail_model.dart';
+import '../domain/flood_scenario_model.dart';
 import '../domain/layer_model.dart';
 
 final mapRepositoryProvider = Provider<MapRepository>(
@@ -78,6 +79,37 @@ class MapRepository {
     ),
     LayerModel.fromJson,
   );
+
+  Future<List<FloodScenarioModel>> getFloodScenarios({
+    bool activeOnly = false,
+    int limit = 100,
+  }) async {
+    try {
+      final response = await dio.get(
+        ApiEndpoints.floodScenarios,
+        queryParameters: {'activeOnly': activeOnly, 'limit': limit},
+      );
+      final body = response.data;
+      final Map<String, dynamic> env = body is Map<String, dynamic>
+          ? body
+          : Map<String, dynamic>.from(body as Map);
+      final dataObj = env['data'];
+      List items = [];
+      if (dataObj is Map && dataObj['items'] is List) {
+        items = dataObj['items'] as List;
+      } else if (dataObj is List) {
+        items = dataObj;
+      }
+      return items
+          .map((e) => FloodScenarioModel.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList(growable: false);
+    } on DioException catch (error) {
+      if (CancelToken.isCancel(error)) rethrow;
+      throw mapErrorToAppException(error);
+    } catch (error) {
+      throw mapErrorToAppException(error);
+    }
+  }
 
   Future<LayerLegend> getLegend(String layerId) => _item(
     () => dio.get(ApiEndpoints.webMapLayerLegend(layerId)),
