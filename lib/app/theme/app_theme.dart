@@ -328,13 +328,11 @@ class AppTheme {
         space: 1,
       ),
       navigationBarTheme: NavigationBarThemeData(
-        height: 76,
-        backgroundColor: colorScheme.surfaceContainerLowest,
+        height: 74,
+        backgroundColor: colorScheme.surfaceContainer,
         indicatorColor: selectedContainer,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        indicatorShape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(13),
-        ),
+        indicatorShape: const StadiumBorder(),
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         iconTheme: WidgetStateProperty.resolveWith(

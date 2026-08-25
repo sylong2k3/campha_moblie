@@ -99,16 +99,12 @@ class MainShell extends StatelessWidget {
           body: navigationShell,
           bottomNavigationBar: DecoratedBox(
             decoration: BoxDecoration(
-              color: colors.surfaceContainerLowest,
-              border: Border(
-                top: BorderSide(
-                  color: colors.outlineVariant.withValues(alpha: 0.72),
-                ),
-              ),
+              color: colors.surfaceContainer,
               boxShadow: [
                 BoxShadow(
-                  color: colors.shadow.withValues(alpha: 0.06),
-                  blurRadius: 16,
+                  color: colors.shadow.withValues(alpha: 0.08),
+                  blurRadius: 18,
+                  spreadRadius: -2,
                   offset: const Offset(0, -3),
                 ),
               ],

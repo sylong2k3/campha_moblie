@@ -131,10 +131,12 @@ class AppStateSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final duration = AppMotion.of(context, AppMotion.surface);
+    if (AppMotion.disabled(context)) {
+      return KeyedSubtree(key: stateKey, child: child);
+    }
     final switcher = AnimatedSwitcher(
-      duration: duration,
-      reverseDuration: AppMotion.of(context, AppMotion.state),
+      duration: AppMotion.surface,
+      reverseDuration: AppMotion.state,
       switchInCurve: AppMotion.surfaceCurve,
       switchOutCurve: AppMotion.stateCurve,
       transitionBuilder: AppMotion.stateTransition,
@@ -146,7 +148,7 @@ class AppStateSwitcher extends StatelessWidget {
     );
     if (!animateSize) return switcher;
     return AnimatedSize(
-      duration: duration,
+      duration: AppMotion.surface,
       curve: AppMotion.surfaceCurve,
       alignment: alignment,
       child: switcher,

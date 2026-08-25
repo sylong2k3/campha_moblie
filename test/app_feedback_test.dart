@@ -111,13 +111,13 @@ void main() {
       ),
     );
 
-    final switcher = tester.widget<AnimatedSwitcher>(
+    expect(
       find.descendant(
         of: find.byType(AppStateSwitcher),
         matching: find.byType(AnimatedSwitcher),
       ),
+      findsNothing,
     );
-    expect(switcher.duration, Duration.zero);
     setHostState(() => state = 1);
     await tester.pump();
     expect(find.text('state-0'), findsNothing);
