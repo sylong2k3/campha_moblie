@@ -361,7 +361,9 @@ class ReportComposerController extends Notifier<ReportComposerState> {
           debugPrint('  response.data: ${error.response?.data}');
           if (error.error != null) debugPrint('  inner: ${error.error}');
           final uri = error.requestOptions.uri;
-          debugPrint('  request.url: ${uri.scheme}://${uri.host}:${uri.port}${uri.path}');
+          debugPrint(
+            '  request.url: ${uri.scheme}://${uri.host}:${uri.port}${uri.path}',
+          );
         }
       }
       if (failed >= 0) {

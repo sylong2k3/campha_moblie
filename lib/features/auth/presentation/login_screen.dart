@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/router/app_router.dart';
+import '../../../app/theme/app_motion.dart';
 import '../../../core/l10n/l10n.dart';
 import '../domain/session_controller.dart';
 import 'auth_widgets.dart';
@@ -74,9 +75,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (targetContext != null) {
         await Scrollable.ensureVisible(
           targetContext,
-          duration: MediaQuery.disableAnimationsOf(context)
-              ? Duration.zero
-              : const Duration(milliseconds: 180),
+          duration: AppMotion.of(context, AppMotion.state),
           alignment: 0.25,
         );
       }

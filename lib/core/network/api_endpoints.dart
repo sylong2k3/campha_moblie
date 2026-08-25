@@ -78,8 +78,8 @@ class ApiEndpoints {
   static String storageObject(String id) => '/storage/objects/$id';
   static String storageObjectFile(String id, {String? ticket}) =>
       ticket != null && ticket.isNotEmpty
-          ? '/storage/objects/$id/file?ticket=${Uri.encodeQueryComponent(ticket)}'
-          : '/storage/objects/$id/file';
+      ? '/storage/objects/$id/file?ticket=${Uri.encodeQueryComponent(ticket)}'
+      : '/storage/objects/$id/file';
   static const deviceToken = '/devices/push-token';
 
   // ── Tin tức & Văn bản báo cáo (server-campha src/routes/cms.routes.js) ─────

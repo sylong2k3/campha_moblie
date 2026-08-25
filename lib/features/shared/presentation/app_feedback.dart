@@ -1,3 +1,4 @@
+import 'package:campha_moblie/app/theme/app_motion.dart';
 import 'package:flutter/material.dart';
 
 enum AppFeedbackTone { neutral, info, warning, error, success }
@@ -43,60 +44,112 @@ class AppInlineNotice extends StatelessWidget {
         colors.onSurfaceVariant,
       ),
     };
+    final contentKey = ValueKey('${tone.name}:$message:${actionLabel ?? ''}');
     return Semantics(
       container: true,
       liveRegion: liveRegion,
-      child: Material(
-        color: background,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final stackAction =
-                  actionLabel != null &&
-                  onAction != null &&
-                  (constraints.maxWidth < 360 ||
-                      MediaQuery.textScalerOf(context).scale(1) > 1.3);
-              final content = Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(icon, size: 21, color: foreground),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(message, style: TextStyle(color: foreground)),
-                  ),
-                  if (!stackAction &&
-                      actionLabel != null &&
-                      onAction != null) ...[
-                    const SizedBox(width: 6),
-                    TextButton(
-                      style: TextButton.styleFrom(foregroundColor: foreground),
-                      onPressed: onAction,
-                      child: Text(actionLabel!),
+      child: AppStateSwitcher(
+        stateKey: contentKey,
+        animateSize: false,
+        child: Material(
+          color: background,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final stackAction =
+                    actionLabel != null &&
+                    onAction != null &&
+                    (constraints.maxWidth < 360 ||
+                        MediaQuery.textScalerOf(context).scale(1) > 1.3);
+                final content = Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(icon, size: 21, color: foreground),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(message, style: TextStyle(color: foreground)),
+                    ),
+                    if (!stackAction &&
+                        actionLabel != null &&
+                        onAction != null) ...[
+                      const SizedBox(width: 6),
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          foregroundColor: foreground,
+                        ),
+                        onPressed: onAction,
+                        child: Text(actionLabel!),
+                      ),
+                    ],
+                  ],
+                );
+                if (!stackAction) return content;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    content,
+                    Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: TextButton(
+                        style: TextButton.styleFrom(
+                          foregroundColor: foreground,
+                        ),
+                        onPressed: onAction,
+                        child: Text(actionLabel!),
+                      ),
                     ),
                   ],
-                ],
-              );
-              if (!stackAction) return content;
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  content,
-                  Align(
-                    alignment: AlignmentDirectional.centerEnd,
-                    child: TextButton(
-                      style: TextButton.styleFrom(foregroundColor: foreground),
-                      onPressed: onAction,
-                      child: Text(actionLabel!),
-                    ),
-                  ),
-                ],
-              );
-            },
+                );
+              },
+            ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Chuyển giữa loading/error/empty/content mà không làm UI bật đột ngột.
+/// Child cần [stateKey] ổn định theo trạng thái, không theo từng frame dữ liệu.
+class AppStateSwitcher extends StatelessWidget {
+  const AppStateSwitcher({
+    super.key,
+    required this.stateKey,
+    required this.child,
+    this.animateSize = true,
+    this.alignment = Alignment.topCenter,
+  });
+
+  final Key stateKey;
+  final Widget child;
+  final bool animateSize;
+  final AlignmentGeometry alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    final duration = AppMotion.of(context, AppMotion.surface);
+    final switcher = AnimatedSwitcher(
+      duration: duration,
+      reverseDuration: AppMotion.of(context, AppMotion.state),
+      switchInCurve: AppMotion.surfaceCurve,
+      switchOutCurve: AppMotion.stateCurve,
+      transitionBuilder: AppMotion.stateTransition,
+      layoutBuilder: (currentChild, previousChildren) => Stack(
+        alignment: alignment,
+        children: [...previousChildren, ?currentChild],
+      ),
+      child: KeyedSubtree(key: stateKey, child: child),
+    );
+    if (!animateSize) return switcher;
+    return AnimatedSize(
+      duration: duration,
+      curve: AppMotion.surfaceCurve,
+      alignment: alignment,
+      child: switcher,
     );
   }
 }

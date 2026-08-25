@@ -1,3 +1,4 @@
+import 'package:campha_moblie/app/theme/app_motion.dart';
 import 'package:flutter/material.dart';
 
 /// Search input thuần UI. Debounce và request cancellation thuộc feature sử dụng.
@@ -40,28 +41,38 @@ class AppSearchField extends StatelessWidget {
             hintText: hintText,
             counterText: '',
             prefixIcon: const Icon(Icons.search),
-            suffixIcon: loading
-                ? const Padding(
-                    padding: EdgeInsets.all(14),
-                    child: SizedBox.square(
-                      dimension: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                : value.text.isEmpty
-                ? null
-                : IconButton(
-                    tooltip: clearTooltip,
-                    onPressed: () {
-                      controller.clear();
-                      if (onClear case final clear?) {
-                        clear();
-                      } else {
-                        onChanged('');
-                      }
-                    },
-                    icon: const Icon(Icons.close),
-                  ),
+            suffixIcon: SizedBox.square(
+              dimension: 48,
+              child: AnimatedSwitcher(
+                duration: AppMotion.of(context, AppMotion.quick),
+                switchInCurve: AppMotion.stateCurve,
+                switchOutCurve: AppMotion.stateCurve,
+                child: loading
+                    ? const Padding(
+                        key: ValueKey('search-loading'),
+                        padding: EdgeInsets.all(14),
+                        child: SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : value.text.isEmpty
+                    ? const SizedBox.shrink(key: ValueKey('search-empty'))
+                    : IconButton(
+                        key: const ValueKey('search-clear'),
+                        tooltip: clearTooltip,
+                        onPressed: () {
+                          controller.clear();
+                          if (onClear case final clear?) {
+                            clear();
+                          } else {
+                            onChanged('');
+                          }
+                        },
+                        icon: const Icon(Icons.close),
+                      ),
+              ),
+            ),
           ),
         ),
       );

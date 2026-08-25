@@ -101,7 +101,11 @@ class MapRepository {
         items = dataObj;
       }
       return items
-          .map((e) => FloodScenarioModel.fromJson(Map<String, dynamic>.from(e as Map)))
+          .map(
+            (e) => FloodScenarioModel.fromJson(
+              Map<String, dynamic>.from(e as Map),
+            ),
+          )
           .toList(growable: false);
     } on DioException catch (error) {
       if (CancelToken.isCancel(error)) rethrow;
@@ -168,26 +172,28 @@ class MapRepository {
     final minY = lat - bufferDeg;
     final maxX = lng + bufferDeg;
     final maxY = lat + bufferDeg;
-    final uri = Uri.parse(baseUrl).replace(queryParameters: {
-      'service': 'WMS',
-      'version': '1.1.1',
-      'request': 'GetFeatureInfo',
-      'layers': geoserverLayer,
-      'query_layers': geoserverLayer,
-      'bbox': '$minX,$minY,$maxX,$maxY',
-      'width': '101',
-      'height': '101',
-      'srs': 'EPSG:4326',
-      'x': '50',
-      'y': '50',
-      // Bán kính dò theo pixel quanh (x,y) — GeoServer-specific, cần thiết
-      // cho point/multipoint vì mặc định tolerance = 0.
-      'buffer': '32',
-      'info_format': 'application/json',
-      'exceptions': 'application/json',
-      'feature_count': '5',
-      if (ticket != null && ticket.isNotEmpty) 'ticket': ticket,
-    });
+    final uri = Uri.parse(baseUrl).replace(
+      queryParameters: {
+        'service': 'WMS',
+        'version': '1.1.1',
+        'request': 'GetFeatureInfo',
+        'layers': geoserverLayer,
+        'query_layers': geoserverLayer,
+        'bbox': '$minX,$minY,$maxX,$maxY',
+        'width': '101',
+        'height': '101',
+        'srs': 'EPSG:4326',
+        'x': '50',
+        'y': '50',
+        // Bán kính dò theo pixel quanh (x,y) — GeoServer-specific, cần thiết
+        // cho point/multipoint vì mặc định tolerance = 0.
+        'buffer': '32',
+        'info_format': 'application/json',
+        'exceptions': 'application/json',
+        'feature_count': '5',
+        if (ticket != null && ticket.isNotEmpty) 'ticket': ticket,
+      },
+    );
     try {
       final response = await dio.getUri<dynamic>(uri);
       final body = response.data;

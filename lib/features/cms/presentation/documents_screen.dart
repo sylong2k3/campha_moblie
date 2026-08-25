@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/theme/app_motion.dart';
 import '../../../core/l10n/l10n.dart';
 import '../../../core/permissions/user_role.dart';
 import '../../auth/domain/session_controller.dart';
+import '../../shared/presentation/app_feedback.dart';
 import '../domain/cms_models.dart';
 import '../domain/paged_controller.dart';
 import 'cms_widgets.dart';
@@ -54,19 +56,37 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen>
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 8, 18, 6),
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: Text(
-                  l10n.documentsVerifiedSource,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
+              padding: const EdgeInsets.fromLTRB(18, 10, 18, 10),
+              child: Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.secondaryContainer,
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: Icon(
+                      Icons.verified_user_outlined,
+                      size: 19,
+                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      l10n.documentsVerifiedSource,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 6, 18, 12),
+              padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
               child: SizedBox(
                 width: double.infinity,
                 child: SegmentedButton<int>(
@@ -79,7 +99,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen>
                     ),
                     ButtonSegment(
                       value: 1,
-                      icon: const Icon(Icons.picture_as_pdf_outlined),
+                      icon: const Icon(Icons.map_outlined),
                       label: Text(l10n.pdfMapsSegment),
                     ),
                   ],
@@ -93,7 +113,21 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen>
             Expanded(
               child: IndexedStack(
                 index: _segment,
-                children: const [_DocumentList(), _PdfMapList()],
+                children: [
+                  for (final entry in const [
+                    (0, _DocumentList()),
+                    (1, _PdfMapList()),
+                  ])
+                    IgnorePointer(
+                      ignoring: _segment != entry.$1,
+                      child: AnimatedOpacity(
+                        duration: AppMotion.of(context, AppMotion.state),
+                        curve: AppMotion.stateCurve,
+                        opacity: _segment == entry.$1 ? 1 : 0,
+                        child: entry.$2,
+                      ),
+                    ),
+                ],
               ),
             ),
           ],
@@ -268,46 +302,55 @@ class _CmsListLayout<T> extends StatelessWidget {
   );
 
   Widget _body(BuildContext context) {
-    if (state.loading && state.items.isEmpty) return const CmsLoadingList();
-    if (state.error != null && state.items.isEmpty) {
-      return CmsErrorState(
-        error: state.error!,
-        onRetry: controller.loadFirstPage,
-      );
-    }
-    if (state.items.isEmpty) {
-      return CmsEmptyState(
-        icon: emptyIcon,
-        title: state.query.isEmpty
-            ? emptyTitle
-            : context.l10n.cmsNoSearchResult,
-        body: state.query.isEmpty
-            ? emptyBody
-            : context.l10n.cmsTryAnotherSearch,
-      );
-    }
-    return RefreshIndicator(
-      onRefresh: controller.loadFirstPage,
-      child: ListView.separated(
-        key: PageStorageKey('cms-${T.toString()}'),
-        controller: scrollController,
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(18, 2, 18, 22),
-        itemCount: state.items.length + 1,
-        separatorBuilder: (_, index) => index == state.items.length - 1
-            ? const SizedBox.shrink()
-            : const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          if (index == state.items.length) {
-            return CmsAppendFooter(
-              loading: state.appending,
-              error: state.appendError,
-              onRetry: controller.loadMore,
-            );
-          }
-          return itemBuilder(context, state.items[index]);
-        },
-      ),
+    final bodyState = state.loading && state.items.isEmpty
+        ? 'loading'
+        : state.error != null && state.items.isEmpty
+        ? 'error'
+        : state.items.isEmpty
+        ? 'empty'
+        : 'content';
+    return AppStateSwitcher(
+      stateKey: ValueKey('cms-${T.toString()}-$bodyState'),
+      animateSize: false,
+      child: switch (bodyState) {
+        'loading' => const CmsLoadingList(),
+        'error' => CmsErrorState(
+          error: state.error!,
+          onRetry: controller.loadFirstPage,
+        ),
+        'empty' => CmsEmptyState(
+          icon: emptyIcon,
+          title: state.query.isEmpty
+              ? emptyTitle
+              : context.l10n.cmsNoSearchResult,
+          body: state.query.isEmpty
+              ? emptyBody
+              : context.l10n.cmsTryAnotherSearch,
+        ),
+        _ => RefreshIndicator(
+          onRefresh: controller.loadFirstPage,
+          child: ListView.separated(
+            key: PageStorageKey('cms-${T.toString()}'),
+            controller: scrollController,
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(18, 2, 18, 22),
+            itemCount: state.items.length + 1,
+            separatorBuilder: (_, index) => index == state.items.length - 1
+                ? const SizedBox.shrink()
+                : const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              if (index == state.items.length) {
+                return CmsAppendFooter(
+                  loading: state.appending,
+                  error: state.appendError,
+                  onRetry: controller.loadMore,
+                );
+              }
+              return itemBuilder(context, state.items[index]);
+            },
+          ),
+        ),
+      },
     );
   }
 }
@@ -376,14 +419,13 @@ class _FileCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 52,
-                height: 52,
+                width: 50,
+                height: 50,
                 decoration: BoxDecoration(
                   color: colors.secondaryContainer,
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: colors.outlineVariant),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(icon, color: colors.onSecondaryContainer, size: 27),
+                child: Icon(icon, color: colors.onSecondaryContainer, size: 25),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -431,8 +473,12 @@ class _FileCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Icon(Icons.chevron_right, color: colors.primary),
+              const SizedBox(width: 6),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 16,
+                color: colors.outline,
+              ),
             ],
           ),
         ),

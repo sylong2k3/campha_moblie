@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -12,6 +11,7 @@ import 'package:image_picker/image_picker.dart' as picker;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
 import '../../../app/router/route_names.dart';
+import '../../../app/theme/app_motion.dart';
 import '../../../core/error/error_l10n.dart';
 import '../../../core/l10n/l10n.dart';
 import '../../../core/network/api_config.dart';
@@ -261,9 +261,7 @@ class _CreateFieldReportScreenState
       if (targetContext != null) {
         await Scrollable.ensureVisible(
           targetContext,
-          duration: MediaQuery.disableAnimationsOf(context)
-              ? Duration.zero
-              : const Duration(milliseconds: 180),
+          duration: AppMotion.of(context, AppMotion.state),
           alignment: 0.25,
         );
       }
@@ -275,9 +273,7 @@ class _CreateFieldReportScreenState
       if (targetContext != null) {
         await Scrollable.ensureVisible(
           targetContext,
-          duration: MediaQuery.disableAnimationsOf(context)
-              ? Duration.zero
-              : const Duration(milliseconds: 180),
+          duration: AppMotion.of(context, AppMotion.state),
           alignment: 0.5,
         );
       }
@@ -327,9 +323,10 @@ class _CreateFieldReportScreenState
                     ),
                   Expanded(
                     child: AnimatedSwitcher(
-                      duration: MediaQuery.disableAnimationsOf(context)
-                          ? Duration.zero
-                          : const Duration(milliseconds: 240),
+                      duration: AppMotion.of(context, AppMotion.page),
+                      switchInCurve: AppMotion.surfaceCurve,
+                      switchOutCurve: AppMotion.stateCurve,
+                      transitionBuilder: AppMotion.stateTransition,
                       child: switch (state.step) {
                         0 => _EvidenceStep(
                           key: const ValueKey('report-step-evidence'),
@@ -421,9 +418,7 @@ class _StepHeader extends StatelessWidget {
                     child: Column(
                       children: [
                         AnimatedContainer(
-                          duration: MediaQuery.disableAnimationsOf(context)
-                              ? Duration.zero
-                              : const Duration(milliseconds: 220),
+                          duration: AppMotion.of(context, AppMotion.surface),
                           height: 5,
                           margin: EdgeInsets.only(right: index < 2 ? 7 : 0),
                           decoration: BoxDecoration(
@@ -666,15 +661,12 @@ class _LocationStepState extends ConsumerState<_LocationStep> {
         ..strokeWidth = 4,
     );
     canvas.drawCircle(center, 17, Paint()..color = const Color(0xFFFFFFFF));
-    canvas.drawCircle(
-      center,
-      9,
-      Paint()..color = const Color(0xFF073719),
-    );
+    canvas.drawCircle(center, 9, Paint()..color = const Color(0xFF073719));
 
-    final image = await recorder
-        .endRecording()
-        .toImage(markerWidth, markerHeight);
+    final image = await recorder.endRecording().toImage(
+      markerWidth,
+      markerHeight,
+    );
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
     image.dispose();
     return bytes!.buffer.asUint8List();

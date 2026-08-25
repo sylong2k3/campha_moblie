@@ -10,26 +10,29 @@ void main() {
       final dark = AppTheme.dark();
 
       expect(light.colorScheme, lightColorScheme);
-      expect(light.colorScheme.primary, const Color(0xFF16A34A));
-      expect(light.colorScheme.secondary, const Color(0xFFF4F4F5));
-      expect(light.colorScheme.surface, const Color(0xFFFCFCFC));
-      expect(light.colorScheme.error, const Color(0xFFEF4444));
+      expect(light.colorScheme.primary, const Color(0xFF006B63));
+      expect(light.colorScheme.secondary, const Color(0xFF3E6375));
+      expect(light.colorScheme.tertiary, const Color(0xFF805610));
+      expect(light.colorScheme.surface, const Color(0xFFF8FAF9));
+      expect(light.colorScheme.error, const Color(0xFFB42318));
       expect(light.scaffoldBackgroundColor, lightColorScheme.surface);
 
       expect(dark.colorScheme, darkColorScheme);
-      expect(dark.colorScheme.primary, const Color(0xFF22C55E));
-      expect(dark.colorScheme.secondary, const Color(0xFF27272A));
-      expect(dark.colorScheme.surface, const Color(0xFF080808));
-      expect(dark.colorScheme.error, const Color(0xFF7F1D1D));
+      expect(dark.colorScheme.primary, const Color(0xFF5ED8CA));
+      expect(dark.colorScheme.secondary, const Color(0xFFB7D1DC));
+      expect(dark.colorScheme.tertiary, const Color(0xFFF6C453));
+      expect(dark.colorScheme.surface, const Color(0xFF071412));
+      expect(dark.colorScheme.error, const Color(0xFFFFB4AA));
       expect(dark.scaffoldBackgroundColor, darkColorScheme.surface);
     });
 
-    test('legacy custom tokens also use only the supplied palette', () {
+    test('legacy custom tokens follow the coastal GIS palette', () {
       expect(AppColors.primary, lightColorScheme.primary);
       expect(AppColors.primaryDark, darkColorScheme.primary);
-      expect(AppColors.background, lightColorScheme.surface);
+      expect(AppColors.background, const Color(0xFFF5F8F7));
       expect(AppColors.darkBackground, darkColorScheme.surface);
       expect(AppColors.statusError, lightColorScheme.error);
+      expect(AppColors.warning, const Color(0xFFF6C453));
       expect(AppColors.border, lightColorScheme.outlineVariant);
       expect(AppColors.darkBorder, darkColorScheme.outlineVariant);
     });
@@ -45,6 +48,28 @@ void main() {
         expect(background, isNotNull);
         expect(foreground, isNot(background));
         expect(_contrast(foreground!, background!), greaterThanOrEqualTo(4.5));
+        expect(
+          theme.navigationBarTheme.labelBehavior,
+          NavigationDestinationLabelBehavior.alwaysShow,
+        );
+        expect(theme.navigationBarTheme.height, greaterThanOrEqualTo(72));
+      }
+    });
+
+    test('primary, error and warning actions pass WCAG AA', () {
+      for (final scheme in [lightColorScheme, darkColorScheme]) {
+        expect(
+          _contrast(scheme.onPrimary, scheme.primary),
+          greaterThanOrEqualTo(4.5),
+        );
+        expect(
+          _contrast(scheme.onErrorContainer, scheme.errorContainer),
+          greaterThanOrEqualTo(4.5),
+        );
+        expect(
+          _contrast(scheme.onTertiaryContainer, scheme.tertiaryContainer),
+          greaterThanOrEqualTo(4.5),
+        );
       }
     });
 

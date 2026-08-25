@@ -16,54 +16,51 @@ LayerModel _floodLayer() => LayerModel(
 );
 
 void main() {
-  test('getLegendItems prefers server-provided colors even for flood layers', () {
-    final legend = LayerLegend.fromJson({
-      'layerId': '1',
-      'code': 'lop_phu_sau_ngap_2015',
-      'nameVi': 'Lớp phủ sau ngập Cẩm Phả năm 2015',
-      'legend': {'Mặt nước hồ chứa': '#004488'},
-    });
-
-    final items = getLegendItems(legend, _floodLayer());
-
-    expect(items, hasLength(1));
-    expect(items.single.label, 'Mặt nước hồ chứa');
-    expect(items.single.color, const Color(0xFF004488));
-  });
-
   test(
-    'getLegendItems falls back to the default preset only when server '
-    'legend is empty for a flood/land-cover layer',
+    'getLegendItems prefers server-provided colors even for flood layers',
     () {
       final legend = LayerLegend.fromJson({
         'layerId': '1',
         'code': 'lop_phu_sau_ngap_2015',
         'nameVi': 'Lớp phủ sau ngập Cẩm Phả năm 2015',
-        'legend': <String, dynamic>{},
+        'legend': {'Mặt nước hồ chứa': '#004488'},
       });
 
       final items = getLegendItems(legend, _floodLayer());
 
-      expect(items, defaultFloodLandCoverLegendItems);
+      expect(items, hasLength(1));
+      expect(items.single.label, 'Mặt nước hồ chứa');
+      expect(items.single.color, const Color(0xFF004488));
     },
   );
 
-  test(
-    'getLegendItems returns an empty list for non flood layers with no '
-    'server legend, instead of the flood preset',
-    () {
-      final legend = LayerLegend.fromJson({
-        'layerId': '2',
-        'code': 'ranhgioi_campha',
-        'nameVi': 'Ranh giới hành chính Cẩm Phả',
-        'legend': <String, dynamic>{},
-      });
+  test('getLegendItems falls back to the default preset only when server '
+      'legend is empty for a flood/land-cover layer', () {
+    final legend = LayerLegend.fromJson({
+      'layerId': '1',
+      'code': 'lop_phu_sau_ngap_2015',
+      'nameVi': 'Lớp phủ sau ngập Cẩm Phả năm 2015',
+      'legend': <String, dynamic>{},
+    });
 
-      final items = getLegendItems(legend);
+    final items = getLegendItems(legend, _floodLayer());
 
-      expect(items, isEmpty);
-    },
-  );
+    expect(items, defaultFloodLandCoverLegendItems);
+  });
+
+  test('getLegendItems returns an empty list for non flood layers with no '
+      'server legend, instead of the flood preset', () {
+    final legend = LayerLegend.fromJson({
+      'layerId': '2',
+      'code': 'ranhgioi_campha',
+      'nameVi': 'Ranh giới hành chính Cẩm Phả',
+      'legend': <String, dynamic>{},
+    });
+
+    final items = getLegendItems(legend);
+
+    expect(items, isEmpty);
+  });
 
   testWidgets(
     'LayerLegendCard fills available width, stays compact, and scrolls '

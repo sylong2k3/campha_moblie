@@ -156,60 +156,72 @@ class _MapSearchScreenState extends ConsumerState<MapSearchScreen> {
               ),
             ),
             Expanded(
-              child: _error != null
-                  ? AppStateMessage(
-                      icon: Icons.cloud_off_outlined,
-                      tone: AppFeedbackTone.error,
-                      title: _error!.localizedErrorMessage(context.l10n),
-                      actionLabel: context.l10n.commonRetry,
-                      onAction: _search,
-                      liveRegion: true,
-                    )
-                  : _query.length < 2
-                  ? AppStateMessage(
-                      icon: Icons.travel_explore,
-                      title: context.l10n.mapSearchPrompt,
-                    )
-                  : !_loading && _results.isEmpty
-                  ? AppStateMessage(
-                      icon: Icons.search_off,
-                      title: context.l10n.mapSearchEmpty,
-                      liveRegion: true,
-                    )
-                  : ListView(
-                      padding: const EdgeInsets.fromLTRB(18, 6, 18, 26),
-                      children: [
-                        for (final group in groups.entries) ...[
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(4, 14, 4, 8),
-                            child: Text(
-                              group.key,
-                              style: Theme.of(context).textTheme.titleMedium,
+              child: AppStateSwitcher(
+                stateKey: ValueKey(
+                  _error != null
+                      ? 'map-search-error'
+                      : _query.length < 2
+                      ? 'map-search-prompt'
+                      : !_loading && _results.isEmpty
+                      ? 'map-search-empty'
+                      : 'map-search-results',
+                ),
+                animateSize: false,
+                child: _error != null
+                    ? AppStateMessage(
+                        icon: Icons.cloud_off_outlined,
+                        tone: AppFeedbackTone.error,
+                        title: _error!.localizedErrorMessage(context.l10n),
+                        actionLabel: context.l10n.commonRetry,
+                        onAction: _search,
+                        liveRegion: true,
+                      )
+                    : _query.length < 2
+                    ? AppStateMessage(
+                        icon: Icons.travel_explore,
+                        title: context.l10n.mapSearchPrompt,
+                      )
+                    : !_loading && _results.isEmpty
+                    ? AppStateMessage(
+                        icon: Icons.search_off,
+                        title: context.l10n.mapSearchEmpty,
+                        liveRegion: true,
+                      )
+                    : ListView(
+                        padding: const EdgeInsets.fromLTRB(18, 6, 18, 26),
+                        children: [
+                          for (final group in groups.entries) ...[
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(4, 14, 4, 8),
+                              child: Text(
+                                group.key,
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
                             ),
-                          ),
-                          Card(
-                            clipBehavior: Clip.antiAlias,
-                            child: Column(
-                              children: [
-                                for (final item in group.value)
-                                  ListTile(
-                                    key: ValueKey(
-                                      'map-result-${item.layerId}-${item.featureId}',
+                            Card(
+                              clipBehavior: Clip.antiAlias,
+                              child: Column(
+                                children: [
+                                  for (final item in group.value)
+                                    ListTile(
+                                      key: ValueKey(
+                                        'map-result-${item.layerId}-${item.featureId}',
+                                      ),
+                                      leading: const Icon(
+                                        Icons.location_on_outlined,
+                                      ),
+                                      title: Text(item.label),
+                                      subtitle: Text(item.layerCode),
+                                      trailing: const Icon(Icons.north_east),
+                                      onTap: () => context.pop(item),
                                     ),
-                                    leading: const Icon(
-                                      Icons.location_on_outlined,
-                                    ),
-                                    title: Text(item.label),
-                                    subtitle: Text(item.layerCode),
-                                    trailing: const Icon(Icons.north_east),
-                                    onTap: () => context.pop(item),
-                                  ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
+                          ],
                         ],
-                      ],
-                    ),
+                      ),
+              ),
             ),
           ],
         ),

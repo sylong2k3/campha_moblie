@@ -309,10 +309,7 @@ class _CmsFileDetailScreenState extends ConsumerState<CmsFileDetailScreen> {
       final shareUrl = ApiConfig.rewriteStorageUrl(grant.url.toString());
       if (share) {
         await SharePlus.instance.share(
-          ShareParams(
-            subject: grant.fileName,
-            text: shareUrl,
-          ),
+          ShareParams(subject: grant.fileName, text: shareUrl),
         );
       } else {
         final opened = await launchUrl(

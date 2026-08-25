@@ -8,6 +8,7 @@ import 'package:geolocator/geolocator.dart' as geo;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_motion.dart';
 import '../../../core/l10n/l10n.dart';
 import '../../../core/network/api_config.dart';
 import '../../../core/storage/token_storage.dart';
@@ -73,7 +74,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
 
   final ViewportState _initialViewport = CameraViewportState(
     center: Point(coordinates: Position(107.32, 21.07)),
-    zoom: 8.2,
+    zoom: 9.6,
   );
   final Set<String> _renderedLayerIds = {};
   late final TokenStorage _tokenStorage;
@@ -194,7 +195,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     await map.setCamera(
       CameraOptions(
         center: Point(coordinates: Position(107.32, 21.07)),
-        zoom: 8.2,
+        zoom: 9.6,
       ),
     );
     await map.setBounds(_camPhaCameraBounds);
@@ -892,7 +893,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
         center: Point(coordinates: Position(result.longitude, result.latitude)),
         zoom: 16,
       ),
-      MapAnimationOptions(duration: 900),
+      MapAnimationOptions(duration: AppMotion.camera(context, far: true)),
     );
     if (!mounted) return;
     context.push('/map/feature/${result.layerId}/${result.featureId}');
@@ -926,13 +927,38 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
   }
 
   void _openTools() {
+    final sheetItems = <_ToolItem>[
+      _ToolItem(
+        Icons.water_drop_outlined,
+        'Kịch bản ngập úng',
+        _openFloodScenarios,
+      ),
+      _ToolItem(
+        Icons.location_searching_rounded,
+        context.l10n.locationWeatherTitle,
+        _openLocationWeather,
+      ),
+      _ToolItem(
+        Icons.straighten_rounded,
+        context.l10n.measureTitle,
+        _openMeasure,
+      ),
+      _ToolItem(Icons.route_outlined, context.l10n.routeTitle, _openRoute),
+      if (ref.read(sessionControllerProvider).user case final user?
+          when user.roleCode == 'so_tnmt' &&
+              user.hasPermission('map_feature', 'update'))
+        _ToolItem(
+          Icons.sync_problem_outlined,
+          context.l10n.featureSyncTitle,
+          () => context.push('/map/offline-changes'),
+        ),
+    ];
     showModalBottomSheet<void>(
       context: context,
-      showDragHandle: true,
       isScrollControlled: true,
       builder: (sheetContext) => SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(18, 0, 18, 20),
+          padding: const EdgeInsets.fromLTRB(18, 2, 18, 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -941,51 +967,36 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
                 context.l10n.fieldToolsTitle,
                 style: Theme.of(context).textTheme.titleLarge,
               ),
-              Text(context.l10n.fieldToolsSubtitle),
-              const SizedBox(height: 14),
-              _ToolTile(
-                icon: Icons.water_damage_outlined,
-                title: 'Kịch bản ngập úng',
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _openFloodScenarios();
-                },
-              ),
-              _ToolTile(
-                icon: Icons.location_on_outlined,
-                title: context.l10n.locationWeatherTitle,
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _openLocationWeather();
-                },
-              ),
-              _ToolTile(
-                icon: Icons.straighten,
-                title: context.l10n.measureTitle,
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _openMeasure();
-                },
-              ),
-              _ToolTile(
-                icon: Icons.route_outlined,
-                title: context.l10n.routeTitle,
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _openRoute();
-                },
-              ),
-              if (ref.read(sessionControllerProvider).user case final user?
-                  when user.roleCode == 'so_tnmt' &&
-                      user.hasPermission('map_feature', 'update'))
-                _ToolTile(
-                  icon: Icons.sync_problem_outlined,
-                  title: context.l10n.featureSyncTitle,
-                  onTap: () {
-                    Navigator.pop(sheetContext);
-                    context.push('/map/offline-changes');
-                  },
+              const SizedBox(height: 4),
+              Text(
+                context.l10n.fieldToolsSubtitle,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
+              ),
+              const SizedBox(height: 14),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                  mainAxisExtent: 56,
+                ),
+                itemCount: sheetItems.length,
+                itemBuilder: (context, index) {
+                  final item = sheetItems[index];
+                  return _ToolTile(
+                    icon: item.icon,
+                    title: item.title,
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      item.onTap();
+                    },
+                  );
+                },
+              ),
             ],
           ),
         ),
@@ -997,9 +1008,9 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
       _map?.flyTo(
         CameraOptions(
           center: Point(coordinates: Position(107.32, 21.07)),
-          zoom: 8.2,
+          zoom: 9.6,
         ),
-        MapAnimationOptions(duration: 700),
+        MapAnimationOptions(duration: AppMotion.camera(context, far: true)),
       ) ??
       Future.value();
 
@@ -1066,46 +1077,81 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
           if (!toolActive)
             SafeArea(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 20),
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 16),
                 child: Column(
                   children: [
                     Semantics(
                       button: true,
                       label: context.l10n.mapSearchHint,
                       child: Material(
-                        elevation: 2,
+                        elevation: 3,
                         shadowColor: AppColors.primaryDeep.withValues(
-                          alpha: 0.18,
+                          alpha: 0.16,
                         ),
-                        color: Theme.of(context).colorScheme.surfaceContainer,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerLowest,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(18),
                           side: BorderSide(
-                            color: Theme.of(context).colorScheme.outlineVariant,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.outlineVariant.withValues(alpha: 0.8),
                           ),
                         ),
                         clipBehavior: Clip.antiAlias,
                         child: InkWell(
                           key: const ValueKey('map-search-open'),
                           onTap: _openSearch,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 15,
-                              vertical: 13,
-                            ),
+                          child: SizedBox(
+                            height: 54,
                             child: Row(
                               children: [
+                                const SizedBox(width: 16),
                                 Icon(
-                                  Icons.search,
+                                  Icons.search_rounded,
                                   color: Theme.of(context).colorScheme.primary,
                                 ),
-                                const SizedBox(width: 11),
+                                const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
                                     _selectedFeatureLabel ??
                                         context.l10n.mapSearchHint,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: _selectedFeatureLabel == null
+                                              ? Theme.of(
+                                                  context,
+                                                ).colorScheme.onSurfaceVariant
+                                              : Theme.of(
+                                                  context,
+                                                ).colorScheme.onSurface,
+                                        ),
                                   ),
                                 ),
+                                Container(
+                                  width: 1,
+                                  height: 24,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.outlineVariant,
+                                ),
+                                IconButton(
+                                  tooltip: context.l10n.mapLayersCount(
+                                    catalog.activeCount,
+                                  ),
+                                  onPressed: _openCatalog,
+                                  icon: Badge.count(
+                                    count: catalog.activeCount,
+                                    isLabelVisible: catalog.activeCount > 0,
+                                    child: const Icon(Icons.layers_outlined),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
                               ],
                             ),
                           ),
@@ -1135,78 +1181,90 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            _MapControl(
-                              key: const ValueKey('map-basemap-open'),
-                              icon: Icons.map_outlined,
-                              tooltip: context.l10n.mapBasemapTitle,
-                              onTap: _openBasemapSelector,
+                            _MapControlGroup(
+                              children: [
+                                _MapControl(
+                                  key: const ValueKey('map-basemap-open'),
+                                  icon: Icons.public_outlined,
+                                  tooltip: context.l10n.mapBasemapTitle,
+                                  onTap: _openBasemapSelector,
+                                ),
+                                _MapControl(
+                                  key: const ValueKey(
+                                    'map-flood-scenarios-open',
+                                  ),
+                                  icon: Icons.water_drop_outlined,
+                                  tooltip: 'Kịch bản ngập úng',
+                                  onTap: _openFloodScenarios,
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 9),
-                            _MapControl(
-                              key: const ValueKey('map-flood-scenarios-open'),
-                              icon: Icons.water_damage_outlined,
-                              tooltip: 'Kịch bản ngập úng',
-                              onTap: _openFloodScenarios,
-                            ),
-                            const SizedBox(height: 9),
-                            _MapControl(
-                              icon: Icons.explore_outlined,
-                              tooltip: context.l10n.mapRecenter,
-                              onTap: _recenter,
-                            ),
-                            const SizedBox(height: 9),
-                            _MapControl(
-                              icon: Icons.my_location,
-                              tooltip: context.l10n.mapGpsAction,
-                              onTap: _openLocationWeather,
-                            ),
-                            const SizedBox(height: 9),
-                            _MapControl(
-                              icon: Icons.handyman_outlined,
-                              tooltip: context.l10n.fieldToolsTitle,
-                              onTap: _openTools,
+                            const SizedBox(height: 10),
+                            _MapControlGroup(
+                              children: [
+                                _MapControl(
+                                  icon: Icons.explore_outlined,
+                                  tooltip: context.l10n.mapRecenter,
+                                  onTap: _recenter,
+                                ),
+                                _MapControl(
+                                  icon: Icons.my_location_rounded,
+                                  tooltip: context.l10n.mapGpsAction,
+                                  onTap: _openLocationWeather,
+                                ),
+                              ],
                             ),
                           ],
                         ),
                       ),
                     ),
                     const Spacer(),
-                    if (hasFloodLandCover && _showLegendCard) ...[
-                      LayerLegendCard(
-                        title: activeFloodLayer.nameVi,
-                        items: floodLegendItems,
-                        onClose: () => setState(() => _showLegendCard = false),
-                      ),
-                      const SizedBox(height: 10),
-                    ],
-                    Row(
-                      children: [
-                        FilledButton.icon(
-                          key: const ValueKey('map-layers-open'),
-                          onPressed: _openCatalog,
-                          icon: const Icon(Icons.layers_outlined),
-                          label: Text(
-                            context.l10n.mapLayersCount(catalog.activeCount),
-                          ),
-                        ),
-                        const Spacer(),
-                        if (hasFloodLandCover)
-                          ActionChip(
-                            key: const ValueKey('map-legend-toggle'),
-                            avatar: Icon(
-                              _showLegendCard
-                                  ? Icons.palette
-                                  : Icons.palette_outlined,
-                              size: 16,
-                              color: Theme.of(context).colorScheme.primary,
+                    AnimatedSwitcher(
+                      duration: AppMotion.of(context, AppMotion.surface),
+                      reverseDuration: AppMotion.of(context, AppMotion.state),
+                      transitionBuilder: AppMotion.stateTransition,
+                      child: hasFloodLandCover && _showLegendCard
+                          ? Padding(
+                              key: ValueKey(
+                                'map-legend-${activeFloodLayer.id}',
+                              ),
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: LayerLegendCard(
+                                title: activeFloodLayer.nameVi,
+                                items: floodLegendItems,
+                                onClose: () =>
+                                    setState(() => _showLegendCard = false),
+                              ),
+                            )
+                          : const SizedBox.shrink(
+                              key: ValueKey('map-legend-hidden'),
                             ),
-                            label: const Text('Chú giải'),
-                            onPressed: () {
-                              setState(() {
-                                _showLegendCard = !_showLegendCard;
-                              });
-                            },
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (hasFloodLandCover) ...[
+                          IconButton.filledTonal(
+                            key: const ValueKey('map-legend-toggle'),
+                            tooltip: 'Chú giải',
+                            onPressed: () => setState(
+                              () => _showLegendCard = !_showLegendCard,
+                            ),
+                            icon: Icon(
+                              _showLegendCard
+                                  ? Icons.palette_rounded
+                                  : Icons.palette_outlined,
+                            ),
                           ),
+                          const SizedBox(width: 8),
+                        ],
+                        FloatingActionButton.small(
+                          key: const ValueKey('map-tools-open'),
+                          heroTag: 'map-tools',
+                          tooltip: context.l10n.fieldToolsTitle,
+                          onPressed: _openTools,
+                          child: const Icon(Icons.handyman_outlined),
+                        ),
                       ],
                     ),
                   ],
@@ -1230,22 +1288,83 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
                 ),
               ),
             ),
-          if (_activeToolPanel != FieldToolMode.idle)
-            Positioned.fill(
-              child: MapToolDraggableSheet(
-                key: ValueKey('map-tool-sheet-${_activeToolPanel.name}'),
-                initialChildSize: _toolSheetInitialSize(_activeToolPanel),
-                maxChildSize: _toolSheetMaxSize(_activeToolPanel),
-                child: switch (_activeToolPanel) {
-                  FieldToolMode.measureDistance || FieldToolMode.measureArea =>
-                    MeasureSheet(onClose: _closeToolPanel),
-                  FieldToolMode.route => RouteSheet(onClose: _closeToolPanel),
-                  _ => const SizedBox.shrink(),
-                },
+          Positioned.fill(
+            child: AnimatedSwitcher(
+              duration: AppMotion.of(context, AppMotion.surface),
+              reverseDuration: AppMotion.of(context, AppMotion.state),
+              transitionBuilder: AppMotion.stateTransition,
+              child: _activeToolPanel == FieldToolMode.idle
+                  ? const SizedBox.shrink(key: ValueKey('map-tool-panel-idle'))
+                  : MapToolDraggableSheet(
+                      key: ValueKey('map-tool-sheet-${_activeToolPanel.name}'),
+                      initialChildSize: _toolSheetInitialSize(_activeToolPanel),
+                      maxChildSize: _toolSheetMaxSize(_activeToolPanel),
+                      child: switch (_activeToolPanel) {
+                        FieldToolMode.measureDistance ||
+                        FieldToolMode.measureArea => MeasureSheet(
+                          onClose: _closeToolPanel,
+                        ),
+                        FieldToolMode.route => RouteSheet(
+                          onClose: _closeToolPanel,
+                        ),
+                        _ => const SizedBox.shrink(),
+                      },
+                    ),
+            ),
+          ),
+          Positioned(
+            top: MediaQuery.paddingOf(context).top + 78,
+            left: 14,
+            right: 14,
+            child: IgnorePointer(
+              child: AnimatedSwitcher(
+                duration: AppMotion.of(context, AppMotion.state),
+                transitionBuilder: AppMotion.stateTransition,
+                child: ((!_loaded || catalog.loading) && _error == null)
+                    ? Semantics(
+                        key: const ValueKey('map-loading-panel'),
+                        liveRegion: true,
+                        label: context.l10n.mapLoading,
+                        child: Material(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerLowest
+                              .withValues(alpha: 0.96),
+                          elevation: 2,
+                          borderRadius: BorderRadius.circular(14),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            child: Row(
+                              children: [
+                                const SizedBox.square(
+                                  dimension: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    context.l10n.mapLoading,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.labelLarge,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      )
+                    : const SizedBox.shrink(
+                        key: ValueKey('map-loading-hidden'),
+                      ),
               ),
             ),
-          if ((!_loaded || catalog.loading) && _error == null)
-            const Center(child: CircularProgressIndicator()),
+          ),
         ],
       ),
     );
@@ -1260,6 +1379,14 @@ double _toolSheetMaxSize(FieldToolMode mode) => switch (mode) {
   _ => MapToolDraggableSheet.minChildSize,
 };
 
+class _ToolItem {
+  const _ToolItem(this.icon, this.title, this.onTap);
+
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+}
+
 class _ToolTile extends StatelessWidget {
   const _ToolTile({
     required this.icon,
@@ -1272,13 +1399,69 @@ class _ToolTile extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Card(
-    margin: const EdgeInsets.only(bottom: 8),
-    child: ListTile(
-      leading: CircleAvatar(child: Icon(icon)),
-      title: Text(title),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: onTap,
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Material(
+      color: colors.surfaceContainerLow,
+      shape: StadiumBorder(side: BorderSide(color: colors.outlineVariant)),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Row(
+            children: [
+              Icon(icon, color: colors.primary, size: 22),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MapControlGroup extends StatelessWidget {
+  const _MapControlGroup({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    elevation: 2,
+    shadowColor: AppColors.primaryDeep.withValues(alpha: 0.14),
+    color: Theme.of(
+      context,
+    ).colorScheme.surfaceContainerLowest.withValues(alpha: 0.97),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(14),
+      side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var index = 0; index < children.length; index++) ...[
+          children[index],
+          if (index != children.length - 1)
+            SizedBox(
+              width: 28,
+              child: Divider(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
+        ],
+      ],
     ),
   );
 }
@@ -1295,23 +1478,11 @@ class _MapControl extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Material(
-    elevation: 2,
-    shadowColor: AppColors.primaryDeep.withValues(alpha: 0.18),
-    color: Theme.of(
-      context,
-    ).colorScheme.surfaceContainer.withValues(alpha: 0.97),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(14),
-      side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-    ),
-    clipBehavior: Clip.antiAlias,
-    child: IconButton(
-      tooltip: tooltip,
-      color: Theme.of(context).colorScheme.primary,
-      onPressed: onTap,
-      icon: Icon(icon),
-    ),
+  Widget build(BuildContext context) => IconButton(
+    tooltip: tooltip,
+    color: Theme.of(context).colorScheme.onSurfaceVariant,
+    onPressed: onTap,
+    icon: Icon(icon),
   );
 }
 

@@ -56,19 +56,37 @@ class _NewsScreenState extends ConsumerState<NewsScreen>
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 8, 18, 6),
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: Text(
-                  l10n.newsOfficialSource,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
+              padding: const EdgeInsets.fromLTRB(18, 10, 18, 10),
+              child: Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: Icon(
+                      Icons.verified_outlined,
+                      size: 19,
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      l10n.newsOfficialSource,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 6, 18, 12),
+              padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
               child: CmsSearchField(
                 hint: l10n.newsSearchHint,
                 initialValue: state.query,
@@ -157,7 +175,15 @@ class _NewsCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (emphasized) Container(height: 5, color: colors.primary),
+              if (emphasized)
+                Container(
+                  height: 4,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [colors.primary, colors.secondary],
+                    ),
+                  ),
+                ),
               Padding(
                 padding: EdgeInsets.all(emphasized ? 20 : 17),
                 child: Column(
@@ -176,7 +202,7 @@ class _NewsCard extends StatelessWidget {
                           ),
                           decoration: BoxDecoration(
                             color: colors.primaryContainer,
-                            borderRadius: BorderRadius.circular(99),
+                            borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
                             context.l10n.newsOfficialBadge,

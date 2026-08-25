@@ -51,7 +51,8 @@ class FloodScenarioModel {
       id: _int(json['id']),
       code: json['code']?.toString() ?? '',
       nameVi: json['name_vi']?.toString() ?? json['nameVi']?.toString() ?? '',
-      layerCode: json['layer_code']?.toString() ?? json['layerCode']?.toString() ?? '',
+      layerCode:
+          json['layer_code']?.toString() ?? json['layerCode']?.toString() ?? '',
       isActive: json['is_active'] == true || json['isActive'] == true,
       minRainfall: _doubleOrNull(json['min_rainfall']),
       maxRainfall: _doubleOrNull(json['max_rainfall']),

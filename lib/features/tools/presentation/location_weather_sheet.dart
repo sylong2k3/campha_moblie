@@ -1,3 +1,4 @@
+import 'package:campha_moblie/app/theme/app_motion.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
@@ -5,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import '../../../core/error/error_l10n.dart';
 import '../../../core/l10n/l10n.dart';
 import '../../../core/network/api_config.dart';
+import '../../shared/presentation/app_feedback.dart';
 import '../domain/field_tools_controller.dart';
 
 class LocationWeatherSheet extends ConsumerWidget {
@@ -17,40 +19,47 @@ class LocationWeatherSheet extends ConsumerWidget {
     final state = ref.watch(fieldToolsProvider);
     final controller = ref.read(fieldToolsProvider.notifier);
     final l10n = context.l10n;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final locationState = switch (state.locationStatus) {
+      LocationStatus.idle => FilledButton.icon(
+        key: const ValueKey('location-start'),
+        onPressed: controller.locate,
+        icon: const Icon(Icons.gps_fixed),
+        label: Text(l10n.locationStart),
+      ),
+      LocationStatus.locating => _LocationLoading(label: l10n.locationLocating),
+      LocationStatus.ready ||
+      LocationStatus.outsideBounds => _LocationCard(state: state),
+      _ => _PermissionState(
+        status: state.locationStatus,
+        onRetry: controller.locate,
+      ),
+    };
+
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.42,
       minChildSize: 0.28,
       maxChildSize: 0.9,
       builder: (context, scroll) => Material(
-        color: Theme.of(context).colorScheme.surface,
+        color: colors.surfaceContainerLowest,
         child: ListView(
           controller: scroll,
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
           children: [
-            Center(
-              child: Container(
-                width: 42,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.outlineVariant,
-                  borderRadius: BorderRadius.circular(99),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
             Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(9),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primaryContainer,
+                    color: colors.primaryContainer,
                     borderRadius: BorderRadius.circular(13),
                   ),
                   child: Icon(
                     Icons.location_on_outlined,
                     size: 21,
-                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    color: colors.onPrimaryContainer,
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -60,11 +69,17 @@ class LocationWeatherSheet extends ConsumerWidget {
                     children: [
                       Text(
                         l10n.locationWeatherTitle,
-                        style: Theme.of(context).textTheme.titleMedium,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
+                      const SizedBox(height: 2),
                       Text(
                         l10n.locationPrimer,
-                        style: Theme.of(context).textTheme.bodySmall,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                          height: 1.25,
+                        ),
                       ),
                     ],
                   ),
@@ -72,38 +87,27 @@ class LocationWeatherSheet extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 12),
-            if (state.locationStatus == LocationStatus.idle)
-              FilledButton.icon(
-                key: const ValueKey('location-start'),
-                onPressed: controller.locate,
-                icon: const Icon(Icons.gps_fixed),
-                label: Text(l10n.locationStart),
-              )
-            else if (state.locationStatus == LocationStatus.locating)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(28),
-                  child: CircularProgressIndicator(),
-                ),
-              )
-            else if (state.locationStatus == LocationStatus.ready ||
-                state.locationStatus == LocationStatus.outsideBounds)
-              _LocationCard(state: state)
-            else
-              _PermissionState(
-                status: state.locationStatus,
-                onRetry: controller.locate,
+            AppStateSwitcher(
+              key: const ValueKey('location-state-switcher'),
+              stateKey: ValueKey('location-state-${state.locationStatus.name}'),
+              child: locationState,
+            ),
+            AppStateSwitcher(
+              stateKey: ValueKey(
+                state.error == null ? 'location-error-empty' : 'location-error',
               ),
-            if (state.error case final error?) ...[
-              const SizedBox(height: 12),
-              Card(
-                color: Theme.of(context).colorScheme.errorContainer,
-                child: ListTile(
-                  leading: const Icon(Icons.cloud_off_outlined),
-                  title: Text(error.localizedErrorMessage(l10n)),
-                ),
-              ),
-            ],
+              child: state.error != null
+                  ? Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: AppInlineNotice(
+                        message: state.error!.localizedErrorMessage(l10n),
+                        icon: Icons.cloud_off_outlined,
+                        tone: AppFeedbackTone.error,
+                        liveRegion: true,
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
             if (state.locationStatus == LocationStatus.ready) ...[
               const SizedBox(height: 12),
               FilledButton.tonalIcon(
@@ -111,65 +115,134 @@ class LocationWeatherSheet extends ConsumerWidget {
                 onPressed: state.loading
                     ? null
                     : () => controller.loadWeatherAndNearby(layerId),
-                icon: const Icon(Icons.cloud_sync_outlined),
+                icon: AnimatedSwitcher(
+                  duration: AppMotion.of(context, AppMotion.quick),
+                  child: state.loading
+                      ? const SizedBox.square(
+                          key: ValueKey('weather-load-progress'),
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(
+                          Icons.cloud_sync_outlined,
+                          key: ValueKey('weather-load-icon'),
+                        ),
+                ),
                 label: Text(l10n.nearbyTitle),
               ),
             ],
-            if (state.weather case final weather?) ...[
-              const SizedBox(height: 18),
-              Text(
-                l10n.weatherTemperature,
-                style: Theme.of(context).textTheme.titleMedium,
+            AppStateSwitcher(
+              stateKey: ValueKey(
+                state.weather == null && state.nearby.isEmpty
+                    ? 'weather-results-empty'
+                    : 'weather-results',
               ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: _Metric(
-                      icon: Icons.thermostat,
-                      value: '${weather.temperatureC.toStringAsFixed(1)} °C',
-                      label: weather.description ?? l10n.weatherTemperature,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _Metric(
-                      icon: Icons.air,
-                      value: '${weather.windSpeedMps.toStringAsFixed(1)} m/s',
-                      label: l10n.weatherWind,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-            if (state.weather != null || state.nearby.isNotEmpty) ...[
-              const SizedBox(height: 22),
-              Text(
-                l10n.nearbyTitle,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 8),
-              if (state.nearby.isEmpty)
-                Text(l10n.nearbyEmpty)
-              else
-                ...state.nearby.map(
-                  (item) => Card(
-                    child: ListTile(
-                      leading: const CircleAvatar(
-                        child: Icon(Icons.near_me_outlined),
-                      ),
-                      title: Text(item.label),
-                      subtitle: Text(
-                        l10n.nearbyDistance(
-                          item.distanceMeters.toStringAsFixed(1),
-                        ),
-                      ),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () => Navigator.pop(context, item.featureId),
-                    ),
-                  ),
+              child: state.weather == null && state.nearby.isEmpty
+                  ? const SizedBox.shrink()
+                  : _WeatherResults(state: state),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WeatherResults extends StatelessWidget {
+  const _WeatherResults({required this.state});
+
+  final FieldToolsState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final l10n = context.l10n;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (state.weather case final weather?) ...[
+          const SizedBox(height: 18),
+          Text(l10n.weatherTemperature, style: theme.textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _Metric(
+                  icon: Icons.thermostat,
+                  value: '${weather.temperatureC.toStringAsFixed(1)} °C',
+                  label: weather.description ?? l10n.weatherTemperature,
                 ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _Metric(
+                  icon: Icons.air,
+                  value: '${weather.windSpeedMps.toStringAsFixed(1)} m/s',
+                  label: l10n.weatherWind,
+                ),
+              ),
             ],
+          ),
+        ],
+        const SizedBox(height: 22),
+        Text(l10n.nearbyTitle, style: theme.textTheme.titleMedium),
+        const SizedBox(height: 8),
+        if (state.nearby.isEmpty)
+          Text(
+            l10n.nearbyEmpty,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          )
+        else
+          ...state.nearby.map(
+            (item) => Card(
+              child: ListTile(
+                leading: const CircleAvatar(
+                  child: Icon(Icons.near_me_outlined),
+                ),
+                title: Text(item.label),
+                subtitle: Text(
+                  l10n.nearbyDistance(item.distanceMeters.toStringAsFixed(1)),
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.pop(context, item.featureId),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _LocationLoading extends StatelessWidget {
+  const _LocationLoading({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      liveRegion: true,
+      label: label,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        decoration: BoxDecoration(
+          color: colors.surfaceContainer,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: colors.outlineVariant),
+        ),
+        child: Row(
+          children: [
+            const SizedBox.square(
+              dimension: 22,
+              child: CircularProgressIndicator(strokeWidth: 2.4),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(label, style: Theme.of(context).textTheme.labelLarge),
+            ),
           ],
         ),
       ),
@@ -193,40 +266,60 @@ class _LocationCard extends StatelessWidget {
         : lowAccuracy
         ? context.l10n.locationAccuracyLow(accuracy.toStringAsFixed(1))
         : context.l10n.locationAccuracy(accuracy.toStringAsFixed(1));
-    return Card(
-      color: outside
-          ? Theme.of(context).colorScheme.errorContainer
-          : Theme.of(context).colorScheme.primaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${coordinate.latitude.toStringAsFixed(6)}, ${coordinate.longitude.toStringAsFixed(6)}',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            if (outside) ...[
-              const SizedBox(height: 6),
-              Text(context.l10n.locationOutsideBounds),
-            ],
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Icon(
-                  lowAccuracy
-                      ? Icons.warning_amber_rounded
-                      : accuracy == null
-                      ? Icons.help_outline
-                      : Icons.gps_fixed,
-                  size: 18,
-                ),
-                const SizedBox(width: 8),
-                Expanded(child: Text(accuracyLabel)),
-              ],
-            ),
-          ],
+    final colors = Theme.of(context).colorScheme;
+    final statusColor = outside || lowAccuracy
+        ? colors.error
+        : accuracy == null
+        ? colors.onSurfaceVariant
+        : colors.primary;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: outside ? colors.errorContainer : colors.surfaceContainer,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: outside
+              ? colors.error.withValues(alpha: 0.35)
+              : colors.outlineVariant,
         ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${coordinate.latitude.toStringAsFixed(6)}, ${coordinate.longitude.toStringAsFixed(6)}',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          if (outside) ...[
+            const SizedBox(height: 6),
+            Text(context.l10n.locationOutsideBounds),
+          ],
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Icon(
+                lowAccuracy
+                    ? Icons.warning_amber_rounded
+                    : accuracy == null
+                    ? Icons.help_outline
+                    : Icons.gps_fixed,
+                size: 18,
+                color: statusColor,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  accuracyLabel,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: lowAccuracy ? colors.error : colors.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -293,19 +386,33 @@ class _Metric extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: colors.primary),
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: colors.primaryContainer,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            alignment: Alignment.center,
+            child: Icon(icon, size: 18, color: colors.onPrimaryContainer),
+          ),
           const SizedBox(height: 10),
           Text(
             value,
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(color: colors.onSurface),
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: colors.onSurface,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.2,
+            ),
           ),
+          const SizedBox(height: 2),
           Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: colors.onSurface),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
           ),
         ],
       ),

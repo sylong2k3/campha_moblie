@@ -48,25 +48,25 @@ class ApiConfig {
       10;
 
   static String get mapboxToken => _value(
-        _defineMapboxToken,
-        'pk.eyJ1IjoiaGlldWhhIiwiYSI6ImNtbDVia21obDAxcjUzZnNkcGpuOG05M3oifQ.68AhyFbI0QZitSIMKfmeGA',
-      );
+    _defineMapboxToken,
+    'pk.eyJ1IjoiaGlldWhhIiwiYSI6ImNtbDVia21obDAxcjUzZnNkcGpuOG05M3oifQ.68AhyFbI0QZitSIMKfmeGA',
+  );
   static String get mapboxStyleOutdoor => _value(
-        _defineMapboxStyleOutdoor,
-        'mapbox://styles/hieuha/cmqknupw8005o01s83401bc52',
-      );
+    _defineMapboxStyleOutdoor,
+    'mapbox://styles/hieuha/cmqknupw8005o01s83401bc52',
+  );
   static String get mapboxStyleSatelliteStreet => _value(
-        _defineMapboxStyleSatelliteStreet,
-        'mapbox://styles/hieuha/cmqknuklz005v01qx9wqe44sf',
-      );
+    _defineMapboxStyleSatelliteStreet,
+    'mapbox://styles/hieuha/cmqknuklz005v01qx9wqe44sf',
+  );
   static String get mapboxStyleStreet => _value(
-        _defineMapboxStyleStreet,
-        'mapbox://styles/hieuha/cmqknut0o005w01qxer55caza',
-      );
+    _defineMapboxStyleStreet,
+    'mapbox://styles/hieuha/cmqknut0o005w01qxer55caza',
+  );
   static String get mapboxStyleSatellite => _value(
-        _defineMapboxStyleSatellite,
-        'mapbox://styles/hieuha/cmqknuev1009p01r5evrtgelg',
-      );
+    _defineMapboxStyleSatellite,
+    'mapbox://styles/hieuha/cmqknuev1009p01r5evrtgelg',
+  );
   static String get wsNotificationsUrl => _value(_defineWsUrl);
 
   static String? validateForRelease({
@@ -95,7 +95,10 @@ class ApiConfig {
     if (geoserver.isEmpty) {
       return 'GEOSERVER_URL release không được để trống.';
     }
-    final geoserverError = _validateProductionUrl(geoserver, field: 'GEOSERVER_URL');
+    final geoserverError = _validateProductionUrl(
+      geoserver,
+      field: 'GEOSERVER_URL',
+    );
     if (geoserverError != null) return geoserverError;
     if (websocket.isNotEmpty) {
       final uri = Uri.tryParse(websocket);

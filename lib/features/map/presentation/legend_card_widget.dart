@@ -12,7 +12,10 @@ class LegendColorItem {
 /// Chú giải chuẩn cho lớp phủ ngập / lớp phủ đất
 const List<LegendColorItem> defaultFloodLandCoverLegendItems = [
   LegendColorItem(label: 'Mặt nước', color: Color(0xFF0080FF)),
-  LegendColorItem(label: 'Rừng LRTX có độ che phủ thưa', color: Color(0xFF004D00)),
+  LegendColorItem(
+    label: 'Rừng LRTX có độ che phủ thưa',
+    color: Color(0xFF004D00),
+  ),
   LegendColorItem(label: 'Dân cư đô thị', color: Color(0xFFFF9999)),
   LegendColorItem(label: 'Đất trống khô', color: Color(0xFFFFFF99)),
   LegendColorItem(label: 'Bãi khai thác than', color: Color(0xFF8B5A2B)),
@@ -47,7 +50,10 @@ List<LegendColorItem> getLegendItems(LayerLegend legend, [LayerModel? layer]) {
     final val = entry.value;
     if (val is String && val.startsWith('#')) {
       final hex = val.replaceFirst('#', '');
-      final colorInt = int.tryParse(hex.length == 6 ? 'FF$hex' : hex, radix: 16);
+      final colorInt = int.tryParse(
+        hex.length == 6 ? 'FF$hex' : hex,
+        radix: 16,
+      );
       if (colorInt != null) {
         items.add(LegendColorItem(label: key, color: Color(colorInt)));
       }
@@ -80,21 +86,22 @@ class LayerLegendCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displayItems =
-        items.isEmpty ? defaultFloodLandCoverLegendItems : items;
+    final displayItems = items.isEmpty
+        ? defaultFloodLandCoverLegendItems
+        : items;
     final columnCount = (displayItems.length / _rowsPerColumn).ceil();
 
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHigh.withValues(
-          alpha: 0.95,
-        ),
+        color: Theme.of(
+          context,
+        ).colorScheme.surfaceContainerHigh.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant.withValues(
-            alpha: 0.6,
-          ),
+          color: Theme.of(
+            context,
+          ).colorScheme.outlineVariant.withValues(alpha: 0.6),
         ),
         boxShadow: [
           BoxShadow(
@@ -125,9 +132,7 @@ class LayerLegendCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           title.isEmpty ? 'Chú Giải' : title,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleSmall
+                          style: Theme.of(context).textTheme.titleSmall
                               ?.copyWith(fontWeight: FontWeight.bold),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -195,9 +200,7 @@ class LayerLegendCard extends StatelessWidget {
                                 Expanded(
                                   child: Text(
                                     item.label,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodySmall
+                                    style: Theme.of(context).textTheme.bodySmall
                                         ?.copyWith(
                                           fontSize: 11.5,
                                           fontWeight: FontWeight.w500,

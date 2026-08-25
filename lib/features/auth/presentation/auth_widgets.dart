@@ -28,31 +28,37 @@ class CivicBrand extends StatelessWidget {
           ),
           child: Icon(
             Icons.map_outlined,
-            color: light ? Colors.white : Colors.white,
+            color: Colors.white,
             size: compact ? 22 : 28,
           ),
         ),
         const SizedBox(width: 12),
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              context.l10n.appTitle.toUpperCase(),
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: foreground,
-                letterSpacing: 1.2,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            if (!compact)
+        Flexible(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Text(
-                context.l10n.brandTagline,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: foreground.withValues(alpha: 0.72),
+                context.l10n.appTitle.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: foreground,
+                  letterSpacing: 1.2,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-          ],
+              if (!compact)
+                Text(
+                  context.l10n.brandTagline,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: foreground.withValues(alpha: 0.72),
+                  ),
+                ),
+            ],
+          ),
         ),
       ],
     );

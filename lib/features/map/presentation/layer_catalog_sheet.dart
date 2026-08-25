@@ -1,3 +1,4 @@
+import 'package:campha_moblie/app/theme/app_motion.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -38,8 +39,8 @@ class _LayerCatalogSheetState extends ConsumerState<LayerCatalogSheet> {
           if (targetContext != null && mounted) {
             Scrollable.ensureVisible(
               targetContext,
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
+              duration: AppMotion.of(context, AppMotion.surface),
+              curve: AppMotion.surfaceCurve,
               alignment: 0.05,
             );
           }
@@ -74,15 +75,6 @@ class _LayerCatalogSheetState extends ConsumerState<LayerCatalogSheet> {
       maxChildSize: 0.95,
       builder: (context, scrollController) => Column(
         children: [
-          const SizedBox(height: 10),
-          Container(
-            width: 42,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.outlineVariant,
-              borderRadius: BorderRadius.circular(99),
-            ),
-          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 14, 12, 8),
             child: Column(
@@ -153,40 +145,50 @@ class _LayerCatalogSheetState extends ConsumerState<LayerCatalogSheet> {
               ),
             ),
           Expanded(
-            child: state.loading && state.layers.isEmpty
-                ? const Center(child: CircularProgressIndicator())
-                : ListView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
-                    children: [
-                      if (categories.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 20),
-                          child: AppInlineNotice(
-                            message: context.l10n.mapNoLayersFound,
-                            icon: Icons.layers_clear_outlined,
-                            tone: AppFeedbackTone.neutral,
-                            liveRegion: true,
-                          ),
-                        )
-                      else
-                        for (final category in categories.entries)
-                          _CategorySection(
-                            key: _categoryKeys.putIfAbsent(
-                              category.key,
-                              GlobalKey.new,
+            child: AppStateSwitcher(
+              stateKey: ValueKey(
+                state.loading && state.layers.isEmpty
+                    ? 'layer-catalog-loading'
+                    : categories.isEmpty
+                    ? 'layer-catalog-empty'
+                    : 'layer-catalog-content',
+              ),
+              animateSize: false,
+              child: state.loading && state.layers.isEmpty
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView(
+                      controller: scrollController,
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 30),
+                      children: [
+                        if (categories.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            child: AppInlineNotice(
+                              message: context.l10n.mapNoLayersFound,
+                              icon: Icons.layers_clear_outlined,
+                              tone: AppFeedbackTone.neutral,
+                              liveRegion: true,
                             ),
-                            category: category.key,
-                            layers: category.value,
-                            state: state,
-                            controller: controller,
-                            initiallyExpanded:
-                                _expandedByCategory[category.key] ?? false,
-                            onExpansionChanged: (expanded) =>
-                                _onCategoryExpanded(category.key, expanded),
-                          ),
-                    ],
-                  ),
+                          )
+                        else
+                          for (final category in categories.entries)
+                            _CategorySection(
+                              key: _categoryKeys.putIfAbsent(
+                                category.key,
+                                GlobalKey.new,
+                              ),
+                              category: category.key,
+                              layers: category.value,
+                              state: state,
+                              controller: controller,
+                              initiallyExpanded:
+                                  _expandedByCategory[category.key] ?? false,
+                              onExpansionChanged: (expanded) =>
+                                  _onCategoryExpanded(category.key, expanded),
+                            ),
+                      ],
+                    ),
+            ),
           ),
         ],
       ),
@@ -294,7 +296,8 @@ class _LayerRow extends ConsumerWidget {
     // trùng nhau trong cùng một category.
     final color = layer.isPoint
         ? layer.displayColor
-        : defaultLayerColorPalette[colorIndex % defaultLayerColorPalette.length];
+        : defaultLayerColorPalette[colorIndex %
+              defaultLayerColorPalette.length];
     return Column(
       children: [
         SwitchListTile(
@@ -380,7 +383,9 @@ class _LayerRow extends ConsumerWidget {
                                     color: item.color,
                                     borderRadius: BorderRadius.circular(4),
                                     border: Border.all(
-                                      color: Colors.black.withValues(alpha: 0.3),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.3,
+                                      ),
                                       width: 0.8,
                                     ),
                                   ),

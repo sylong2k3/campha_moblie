@@ -180,7 +180,7 @@ class _FieldReportsScreenState extends ConsumerState<FieldReportsScreen>
       floatingActionButton: FloatingActionButton.extended(
         key: const ValueKey('report-create-fab'),
         onPressed: () => _openProtected(RoutePaths.reportCreate),
-        icon: const Icon(Icons.add_a_photo_outlined),
+        icon: const Icon(Icons.add_location_alt_outlined),
         label: Text(l10n.reportCreate),
       ),
       body: RefreshIndicator(
@@ -193,7 +193,7 @@ class _FieldReportsScreenState extends ConsumerState<FieldReportsScreen>
           slivers: [
             SliverAppBar(
               pinned: true,
-              expandedHeight: 196,
+              expandedHeight: 164,
               toolbarHeight: 64,
               backgroundColor: colors.primary,
               foregroundColor: colors.onPrimary,
@@ -210,17 +210,15 @@ class _FieldReportsScreenState extends ConsumerState<FieldReportsScreen>
               actions: [
                 Padding(
                   padding: const EdgeInsets.only(right: 12),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: colors.onPrimary.withValues(alpha: 0.13),
-                      borderRadius: BorderRadius.circular(12),
+                  child: IconButton.filledTonal(
+                    key: const ValueKey('my-reports-action'),
+                    onPressed: () => _openProtected(RoutePaths.reportMine),
+                    tooltip: l10n.myReports,
+                    style: IconButton.styleFrom(
+                      backgroundColor: colors.onPrimary.withValues(alpha: 0.14),
+                      foregroundColor: colors.onPrimary,
                     ),
-                    child: IconButton(
-                      key: const ValueKey('my-reports-action'),
-                      onPressed: () => _openProtected(RoutePaths.reportMine),
-                      tooltip: l10n.myReports,
-                      icon: const Icon(Icons.assignment_ind_outlined),
-                    ),
+                    icon: const Icon(Icons.assignment_ind_outlined),
                   ),
                 ),
               ],
@@ -279,9 +277,7 @@ class _FieldReportsScreenState extends ConsumerState<FieldReportsScreen>
                 ),
               ),
             if (state.loading && items.isEmpty)
-              const SliverFillRemaining(
-                child: Center(child: CircularProgressIndicator()),
-              )
+              const SliverFillRemaining(child: _ReportLoadingList())
             else if (state.error != null && items.isEmpty)
               SliverFillRemaining(
                 hasScrollBody: false,
@@ -445,6 +441,87 @@ class _ReportsHero extends StatelessWidget {
       },
     );
   }
+}
+
+class _ReportLoadingList extends StatelessWidget {
+  const _ReportLoadingList();
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.surfaceContainerHighest;
+    return Semantics(
+      liveRegion: true,
+      label: context.l10n.mapLoading,
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 112),
+        itemCount: 4,
+        separatorBuilder: (_, _) => const SizedBox(height: 12),
+        itemBuilder: (context, index) => Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SkeletonBlock(color: color, width: 64, height: 72, radius: 14),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _SkeletonBlock(
+                        color: color,
+                        width: 118,
+                        height: 13,
+                        radius: 99,
+                      ),
+                      const SizedBox(height: 12),
+                      _SkeletonBlock(
+                        color: color,
+                        width: double.infinity,
+                        height: 16,
+                        radius: 5,
+                      ),
+                      const SizedBox(height: 8),
+                      _SkeletonBlock(
+                        color: color,
+                        width: 180,
+                        height: 12,
+                        radius: 5,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SkeletonBlock extends StatelessWidget {
+  const _SkeletonBlock({
+    required this.color,
+    required this.width,
+    required this.height,
+    required this.radius,
+  });
+
+  final Color color;
+  final double width;
+  final double height;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: width,
+    height: height,
+    decoration: BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(radius),
+    ),
+  );
 }
 
 class _ReportViewToggle extends StatelessWidget {
@@ -668,7 +745,7 @@ class _NearbyFilterEffect extends StatelessWidget {
       child: Semantics(
         liveRegion: true,
         child: TweenAnimationBuilder<double>(
-          duration: AppMotion.of(context, const Duration(milliseconds: 320)),
+          duration: AppMotion.of(context, AppMotion.surface),
           curve: AppMotion.surfaceCurve,
           tween: Tween(begin: 0, end: 1),
           builder: (context, value, child) => Opacity(
@@ -1157,7 +1234,7 @@ class _ReportMapState extends State<_ReportMap> {
       final viewport = _viewportForReports();
       await map.flyTo(
         CameraOptions(center: viewport.center, zoom: viewport.zoom),
-        MapAnimationOptions(duration: 450),
+        MapAnimationOptions(duration: AppMotion.camera(context)),
       );
     }
   }

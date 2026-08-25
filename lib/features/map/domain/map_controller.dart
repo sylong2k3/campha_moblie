@@ -128,8 +128,10 @@ class MapCatalogController extends Notifier<MapCatalogState> {
                 l.nameVi.toLowerCase().contains('ranh gioi') ||
                 l.code.toLowerCase().contains('ranh_gioi') ||
                 l.code.toLowerCase().contains('boundary'),
-            orElse: () =>
-                layers.firstWhere((l) => !l.isRaster, orElse: () => layers.first),
+            orElse: () => layers.firstWhere(
+              (l) => !l.isRaster,
+              orElse: () => layers.first,
+            ),
           ),
         );
         defaultActive = {defaultLayer.id};

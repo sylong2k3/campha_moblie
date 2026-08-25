@@ -1,3 +1,4 @@
+import 'package:campha_moblie/app/theme/app_motion.dart';
 import 'package:campha_moblie/core/storage/token_storage.dart';
 import 'package:campha_moblie/features/auth/data/auth_repository.dart';
 import 'package:campha_moblie/features/auth/domain/auth_result.dart';
@@ -84,6 +85,92 @@ void main() {
     expect(controller.text, isEmpty);
     expect(clearCount, 1);
     expect(changes, isEmpty);
+  });
+
+  testWidgets('state switcher respects reduced motion and replaces its child', (
+    tester,
+  ) async {
+    var state = 0;
+    late StateSetter setHostState;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(disableAnimations: true),
+          child: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) {
+                setHostState = setState;
+                return AppStateSwitcher(
+                  stateKey: ValueKey(state),
+                  child: Text('state-$state'),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final switcher = tester.widget<AnimatedSwitcher>(
+      find.descendant(
+        of: find.byType(AppStateSwitcher),
+        matching: find.byType(AnimatedSwitcher),
+      ),
+    );
+    expect(switcher.duration, Duration.zero);
+    setHostState(() => state = 1);
+    await tester.pump();
+    expect(find.text('state-0'), findsNothing);
+    expect(find.text('state-1'), findsOneWidget);
+  });
+
+  testWidgets('search suffix stays 48dp while clear changes to loading', (
+    tester,
+  ) async {
+    final controller = TextEditingController(text: 'quy hoạch');
+    addTearDown(controller.dispose);
+    var loading = false;
+    late StateSetter setHostState;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              setHostState = setState;
+              return AppSearchField(
+                controller: controller,
+                hintText: 'Tìm kiếm',
+                clearTooltip: 'Xóa',
+                loading: loading,
+                onChanged: (_) {},
+                onSubmitted: (_) {},
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    final clearSlot = tester.getSize(
+      find
+          .ancestor(
+            of: find.byKey(const ValueKey('search-clear')),
+            matching: find.byType(SizedBox),
+          )
+          .first,
+    );
+    setHostState(() => loading = true);
+    await tester.pump(AppMotion.quick);
+    final loadingSlot = tester.getSize(
+      find
+          .ancestor(
+            of: find.byKey(const ValueKey('search-loading')),
+            matching: find.byType(SizedBox),
+          )
+          .first,
+    );
+    expect(clearSlot.width, 48);
+    expect(loadingSlot.width, clearSlot.width);
   });
 
   testWidgets('CMS clear cancels debounce and searches empty immediately', (

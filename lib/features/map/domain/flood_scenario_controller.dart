@@ -54,11 +54,7 @@ class FloodScenarioController extends Notifier<FloodScenarioState> {
       final repository = ref.read(mapRepositoryProvider);
       // Chỉ tải các kịch bản ngập đang kích hoạt (activeOnly: true)
       final list = await repository.getFloodScenarios(activeOnly: true);
-      state = state.copyWith(
-        scenarios: list,
-        loading: false,
-        clearError: true,
-      );
+      state = state.copyWith(scenarios: list, loading: false, clearError: true);
     } catch (err) {
       state = state.copyWith(loading: false, error: err);
     }

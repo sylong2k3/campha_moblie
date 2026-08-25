@@ -26,9 +26,9 @@ class ProfileScreen extends ConsumerWidget {
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
-              SliverAppBar.large(title: Text(l10n.navProfile)),
+              SliverAppBar(pinned: true, title: Text(l10n.navProfile)),
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
                 sliver: SliverList.list(
                   children: [
                     if (session.isAuthenticated && session.user != null)
@@ -42,9 +42,14 @@ class ProfileScreen extends ConsumerWidget {
                       Card(
                         child: ListTile(
                           key: const ValueKey('profile-my-reports'),
-                          leading: const Icon(Icons.assignment_outlined),
+                          leading: const _ProfileTileIcon(
+                            icon: Icons.assignment_outlined,
+                          ),
                           title: Text(l10n.myReports),
-                          trailing: const Icon(Icons.chevron_right),
+                          trailing: const Icon(
+                            Icons.arrow_forward_ios_rounded,
+                            size: 16,
+                          ),
                           onTap: () => context.push('/reports/mine'),
                         ),
                       ),
@@ -61,9 +66,14 @@ class ProfileScreen extends ConsumerWidget {
                         child: Column(
                           children: [
                             ListTile(
-                              leading: const Icon(Icons.password_outlined),
+                              leading: const _ProfileTileIcon(
+                                icon: Icons.password_outlined,
+                              ),
                               title: Text(l10n.changePasswordTitle),
-                              trailing: const Icon(Icons.chevron_right),
+                              trailing: const Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                size: 16,
+                              ),
                               onTap: () =>
                                   context.push('/profile/change-password'),
                             ),
@@ -142,7 +152,11 @@ class _AuthenticatedHeader extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colors.primary,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [colors.primary, colors.secondary],
+        ),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -246,17 +260,16 @@ class _PreferencesCard extends ConsumerWidget {
       child: Column(
         children: [
           ListTile(
-            leading: const Icon(Icons.translate),
+            leading: const _ProfileTileIcon(icon: Icons.translate_rounded),
             title: Text(l10n.languageLabel),
             subtitle: Text(
               locale.languageCode == 'en'
                   ? l10n.languageEnglish
                   : l10n.languageVietnamese,
             ),
-            trailing: const Icon(Icons.chevron_right),
+            trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
             onTap: () => showModalBottomSheet<void>(
               context: context,
-              showDragHandle: true,
               builder: (context) => SafeArea(
                 child: RadioGroup<String>(
                   groupValue: locale.languageCode,
@@ -284,19 +297,18 @@ class _PreferencesCard extends ConsumerWidget {
               ),
             ),
           ),
-          const Divider(),
+          const Divider(indent: 64),
           ListTile(
-            leading: const Icon(Icons.contrast),
+            leading: const _ProfileTileIcon(icon: Icons.contrast_rounded),
             title: Text(l10n.themeLabel),
             subtitle: Text(switch (themeMode) {
               ThemeMode.light => l10n.themeLight,
               ThemeMode.dark => l10n.themeDark,
               ThemeMode.system => l10n.themeSystem,
             }),
-            trailing: const Icon(Icons.chevron_right),
+            trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
             onTap: () => showModalBottomSheet<void>(
               context: context,
-              showDragHandle: true,
               builder: (context) => SafeArea(
                 child: RadioGroup<ThemeMode>(
                   groupValue: themeMode,
@@ -330,6 +342,26 @@ class _PreferencesCard extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ProfileTileIcon extends StatelessWidget {
+  const _ProfileTileIcon({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(
+        color: colors.primaryContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(icon, size: 20, color: colors.onPrimaryContainer),
     );
   }
 }

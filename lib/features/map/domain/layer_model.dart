@@ -59,7 +59,8 @@ class LayerModel {
   bool get isPolygon => geometryType.toUpperCase().contains('POLYGON');
 
   Color get displayColor {
-    final hex = legend['color']?.toString() ??
+    final hex =
+        legend['color']?.toString() ??
         legend['fillColor']?.toString() ??
         legend['strokeColor']?.toString() ??
         legend['colorHex']?.toString();
@@ -84,20 +85,22 @@ class LayerModel {
     id: _requiredString(json, 'id'),
     code: _requiredString(json, 'code'),
     nameVi: _requiredString(json, 'nameVi'),
-    category: (json['categoryName'] ??
-            json['category_name'] ??
-            json['categoryNameVi'] ??
-            json['category_name_vi'] ??
-            json['category'])
-        ?.toString()
-        .trim()
-        .isNotEmpty == true
+    category:
+        (json['categoryName'] ??
+                    json['category_name'] ??
+                    json['categoryNameVi'] ??
+                    json['category_name_vi'] ??
+                    json['category'])
+                ?.toString()
+                .trim()
+                .isNotEmpty ==
+            true
         ? (json['categoryName'] ??
-                json['category_name'] ??
-                json['categoryNameVi'] ??
-                json['category_name_vi'] ??
-                json['category'])
-            .toString()
+                  json['category_name'] ??
+                  json['categoryNameVi'] ??
+                  json['category_name_vi'] ??
+                  json['category'])
+              .toString()
         : 'khac',
     geometryType: _requiredString(json, 'geometryType'),
     storageKind: _requiredString(json, 'storageKind'),

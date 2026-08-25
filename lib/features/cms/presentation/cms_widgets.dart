@@ -127,26 +127,49 @@ class CmsLoadingList extends StatelessWidget {
   const CmsLoadingList({super.key});
 
   @override
-  Widget build(BuildContext context) => ListView.separated(
-    padding: const EdgeInsets.all(18),
-    itemCount: 5,
-    separatorBuilder: (_, _) => const SizedBox(height: 12),
-    itemBuilder: (context, index) => Card(
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _bar(context, 0.32),
-            const SizedBox(height: 13),
-            _bar(context, 0.9, height: 18),
-            const SizedBox(height: 8),
-            _bar(context, 0.68),
-          ],
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      liveRegion: true,
+      label: context.l10n.mapLoading,
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(18, 4, 18, 22),
+        itemCount: 5,
+        separatorBuilder: (_, _) => const SizedBox(height: 12),
+        itemBuilder: (context, index) => Card(
+          child: Padding(
+            padding: const EdgeInsets.all(17),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: colors.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _bar(context, 0.34, height: 11),
+                      const SizedBox(height: 11),
+                      _bar(context, 0.92, height: 17),
+                      const SizedBox(height: 8),
+                      _bar(context, 0.68),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 
   Widget _bar(BuildContext context, double fraction, {double height = 12}) =>
       FractionallySizedBox(
@@ -156,7 +179,7 @@ class CmsLoadingList extends StatelessWidget {
           height: height,
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(99),
+            borderRadius: BorderRadius.circular(6),
           ),
         ),
       );
@@ -256,22 +279,32 @@ class CmsAppendFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (loading) {
-      return const Padding(
-        padding: EdgeInsets.all(18),
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
-    if (error != null) {
-      return Padding(
-        padding: const EdgeInsets.all(12),
-        child: OutlinedButton.icon(
-          onPressed: onRetry,
-          icon: const Icon(Icons.refresh),
-          label: Text(context.l10n.cmsLoadMoreRetry),
+    final state = loading
+        ? 'loading'
+        : error != null
+        ? 'error'
+        : 'idle';
+    return AppStateSwitcher(
+      stateKey: ValueKey('cms-append-$state'),
+      alignment: Alignment.center,
+      child: switch (state) {
+        'loading' => Padding(
+          padding: const EdgeInsets.all(18),
+          child: LinearProgressIndicator(
+            minHeight: 3,
+            borderRadius: BorderRadius.circular(99),
+          ),
         ),
-      );
-    }
-    return const SizedBox(height: 18);
+        'error' => Padding(
+          padding: const EdgeInsets.all(12),
+          child: OutlinedButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh),
+            label: Text(context.l10n.cmsLoadMoreRetry),
+          ),
+        ),
+        _ => const SizedBox(height: 18),
+      },
+    );
   }
 }

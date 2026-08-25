@@ -30,8 +30,8 @@ class BasemapSelectionSheet extends ConsumerWidget {
                   Text(
                     context.l10n.mapBasemapTitle,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
