@@ -18,6 +18,7 @@ import 'package:campha_moblie/features/tools/presentation/location_weather_sheet
 import 'package:campha_moblie/l10n/app_localizations.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -302,8 +303,8 @@ void main() {
         child: const _LocalizedApp(
           home: Scaffold(
             body: MapToolDraggableSheet(
-              initialChildSize: 0.32,
-              maxChildSize: 0.32,
+              initialChildSize: 0.26,
+              maxChildSize: 0.26,
               child: MeasureSheet(onClose: _noop),
             ),
           ),
@@ -315,15 +316,37 @@ void main() {
     final draggable = tester.widget<DraggableScrollableSheet>(
       find.byKey(const ValueKey('map-tool-draggable-sheet')),
     );
-    expect(draggable.snapSizes, [0.14, 0.32]);
+    expect(draggable.snapSizes, [0.14, 0.26]);
     expect(tester.getBottomLeft(sheet).dy, closeTo(800, 0.1));
-    expect(tester.getSize(sheet).height, closeTo(800 * 0.32, 1));
+    expect(tester.getSize(sheet).height, closeTo(800 * 0.26, 1));
 
     final top = tester.getTopLeft(sheet);
     await tester.dragFrom(top + const Offset(200, 16), const Offset(0, -500));
     await tester.pumpAndSettle();
-    expect(tester.getSize(sheet).height, closeTo(800 * 0.32, 1));
+    expect(tester.getSize(sheet).height, closeTo(800 * 0.26, 1));
     expect(find.text('Đo đạc'), findsOneWidget);
+    expect(find.byKey(const ValueKey('measure-complete')), findsNothing);
+    expect(find.textContaining('xác nhận'), findsNothing);
+  });
+
+  testWidgets('measure tool shows live result without confirmation action', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          fieldToolsProvider.overrideWith(_LiveMeasureToolsController.new),
+        ],
+        child: const _LocalizedApp(
+          home: Scaffold(body: MeasureSheet(onClose: _noop)),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const ValueKey('measure-live-result')), findsOneWidget);
+    expect(find.byKey(const ValueKey('measure-result-value')), findsOneWidget);
+    expect(find.text('1.52 km'), findsOneWidget);
+    expect(find.byKey(const ValueKey('measure-complete')), findsNothing);
   });
 
   testWidgets('location sheet shows complete privacy text', (tester) async {
@@ -382,6 +405,45 @@ void main() {
     expect(find.text('Độ chính xác ±5.0 m'), findsOneWidget);
     expect(find.textContaining('Độ chính xác thấp'), findsNothing);
     expect(find.byIcon(Icons.gps_fixed), findsWidgets);
+  });
+
+  testWidgets('location sheet refreshes after returning from settings', (
+    tester,
+  ) async {
+    const channel = MethodChannel('flutter.baseflow.com/geolocator');
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, null),
+    );
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+          expect(call.method, 'openLocationSettings');
+          return true;
+        });
+    late _ServiceDisabledToolsController controller;
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          fieldToolsProvider.overrideWith(
+            () => controller = _ServiceDisabledToolsController(),
+          ),
+        ],
+        child: const _LocalizedSheet(),
+      ),
+    );
+
+    await tester.tap(find.text('Mở cài đặt'));
+    await tester.pump();
+    expect(controller.locateCalls, 0);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
+    expect(controller.locateCalls, 1);
+    expect(find.text('Dịch vụ vị trí đang tắt.'), findsNothing);
   });
 
   testWidgets('debug login shows horizontal role strip below forgot password', (
@@ -599,6 +661,24 @@ class _ReadyToolsController extends FieldToolsController {
   );
 }
 
+class _ServiceDisabledToolsController extends FieldToolsController {
+  int locateCalls = 0;
+
+  @override
+  FieldToolsState build() =>
+      const FieldToolsState(locationStatus: LocationStatus.serviceDisabled);
+
+  @override
+  Future<void> locate() async {
+    locateCalls++;
+    state = const FieldToolsState(
+      locationStatus: LocationStatus.ready,
+      location: GeoCoordinate(107.33, 21.01),
+      accuracyMeters: 5,
+    );
+  }
+}
+
 class _DeniedForeverToolsController extends FieldToolsController {
   @override
   FieldToolsState build() => const FieldToolsState(
@@ -611,6 +691,18 @@ class _MeasureToolsController extends FieldToolsController {
   @override
   FieldToolsState build() =>
       const FieldToolsState(mode: FieldToolMode.measureDistance);
+}
+
+class _LiveMeasureToolsController extends FieldToolsController {
+  @override
+  FieldToolsState build() => const FieldToolsState(
+    mode: FieldToolMode.measureDistance,
+    vertices: [GeoCoordinate(107.33, 21), GeoCoordinate(107.34, 21)],
+    measurement: MeasurementResult(
+      geometryType: 'LINESTRING',
+      lengthMeters: 1518.68,
+    ),
+  );
 }
 
 class _RouteResultToolsController extends FieldToolsController {

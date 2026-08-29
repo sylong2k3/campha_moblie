@@ -1937,13 +1937,13 @@ abstract class AppLocalizations {
   /// No description provided for @measureDistanceRequired.
   ///
   /// In vi, this message translates to:
-  /// **'Thêm ít nhất 2 điểm để xác nhận khoảng cách.'**
+  /// **'Chạm thêm 1 điểm để bắt đầu đo khoảng cách.'**
   String get measureDistanceRequired;
 
   /// No description provided for @measureAreaRequired.
   ///
   /// In vi, this message translates to:
-  /// **'Thêm ít nhất 3 điểm để xác nhận diện tích.'**
+  /// **'Chạm thêm điểm để tạo vùng đo diện tích.'**
   String get measureAreaRequired;
 
   /// No description provided for @routeStartRequired.

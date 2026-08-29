@@ -115,10 +115,14 @@ class FieldToolsState {
 
 class FieldToolsController extends Notifier<FieldToolsState> {
   CancelToken? _routeCancelToken;
+  int _measureRevision = 0;
 
   @override
   FieldToolsState build() {
-    ref.onDispose(() => _cancelRoute('controller disposed'));
+    ref.onDispose(() {
+      _measureRevision++;
+      _cancelRoute('controller disposed');
+    });
     return const FieldToolsState();
   }
 
@@ -210,24 +214,30 @@ class FieldToolsController extends Notifier<FieldToolsState> {
   }
 
   void startMeasure({required bool area}) {
+    _measureRevision++;
     state = state.copyWith(
       mode: area ? FieldToolMode.measureArea : FieldToolMode.measureDistance,
       vertices: const [],
       redoVertices: const [],
+      loading: false,
       clearMeasurement: true,
       clearRouteEndpoints: true,
       clearError: true,
     );
   }
 
-  void startRoute() => state = state.copyWith(
-    mode: FieldToolMode.route,
-    vertices: const [],
-    redoVertices: const [],
-    clearMeasurement: true,
-    clearRouteEndpoints: true,
-    clearError: true,
-  );
+  void startRoute() {
+    _measureRevision++;
+    state = state.copyWith(
+      mode: FieldToolMode.route,
+      vertices: const [],
+      redoVertices: const [],
+      loading: false,
+      clearMeasurement: true,
+      clearRouteEndpoints: true,
+      clearError: true,
+    );
+  }
 
   void addMapPoint(GeoCoordinate point) {
     if (!point.isInCamPhaBounds) return;
@@ -257,6 +267,7 @@ class FieldToolsController extends Notifier<FieldToolsState> {
       clearMeasurement: true,
       clearError: true,
     );
+    _refreshMeasurement();
   }
 
   void undo() {
@@ -266,7 +277,9 @@ class FieldToolsController extends Notifier<FieldToolsState> {
       vertices: state.vertices.sublist(0, state.vertices.length - 1),
       redoVertices: [...state.redoVertices, removed],
       clearMeasurement: true,
+      clearError: true,
     );
+    _refreshMeasurement();
   }
 
   void redo() {
@@ -279,24 +292,43 @@ class FieldToolsController extends Notifier<FieldToolsState> {
         state.redoVertices.length - 1,
       ),
       clearMeasurement: true,
+      clearError: true,
     );
+    _refreshMeasurement();
   }
 
-  Future<void> completeMeasure() async {
-    if (!state.canMeasure) return;
-    state = state.copyWith(loading: true, clearError: true);
-    try {
-      final geometry = state.mode == FieldToolMode.measureArea
-          ? GeoJsonGeometry.polygon(state.vertices)
-          : GeoJsonGeometry.line(state.vertices);
-      final result = await ref.read(toolsRepositoryProvider).measure(geometry);
-      state = state.copyWith(measurement: result, loading: false);
-    } catch (error) {
-      state = state.copyWith(
-        loading: false,
-        error: mapErrorToAppException(error),
-      );
+  void _refreshMeasurement() {
+    final revision = ++_measureRevision;
+    if (!state.canMeasure) {
+      state = state.copyWith(loading: false, clearMeasurement: true);
+      return;
     }
+    final geometry = state.mode == FieldToolMode.measureArea
+        ? GeoJsonGeometry.polygon(state.vertices)
+        : GeoJsonGeometry.line(state.vertices);
+    final preview = MeasurementResult.preview(
+      area: state.mode == FieldToolMode.measureArea,
+      points: state.vertices,
+    );
+    state = state.copyWith(
+      measurement: preview,
+      loading: true,
+      clearError: true,
+    );
+    ref
+        .read(toolsRepositoryProvider)
+        .measure(geometry)
+        .then((result) {
+          if (revision != _measureRevision) return;
+          state = state.copyWith(measurement: result, loading: false);
+        })
+        .catchError((Object error) {
+          if (revision != _measureRevision) return;
+          state = state.copyWith(
+            loading: false,
+            error: mapErrorToAppException(error),
+          );
+        });
   }
 
   Future<void> findRoute() async {
@@ -387,6 +419,7 @@ class FieldToolsController extends Notifier<FieldToolsState> {
   }
 
   void cancelTool() {
+    _measureRevision++;
     _cancelRoute('tool cancelled');
     state = FieldToolsState(
       locationStatus: state.locationStatus,
@@ -399,6 +432,7 @@ class FieldToolsController extends Notifier<FieldToolsState> {
   }
 
   void clearSensitiveState() {
+    _measureRevision++;
     _cancelRoute('session changed');
     state = const FieldToolsState();
   }

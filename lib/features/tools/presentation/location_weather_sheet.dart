@@ -9,13 +9,53 @@ import '../../../core/network/api_config.dart';
 import '../../shared/presentation/app_feedback.dart';
 import '../domain/field_tools_controller.dart';
 
-class LocationWeatherSheet extends ConsumerWidget {
+class LocationWeatherSheet extends ConsumerStatefulWidget {
   const LocationWeatherSheet({super.key, required this.layerId});
 
   final String? layerId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<LocationWeatherSheet> createState() =>
+      _LocationWeatherSheetState();
+}
+
+class _LocationWeatherSheetState extends ConsumerState<LocationWeatherSheet>
+    with WidgetsBindingObserver {
+  bool _openedSettings = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  Future<void> _retryAfterSettings() async {
+    if (!_openedSettings) return;
+    _openedSettings = false;
+    await ref.read(fieldToolsProvider.notifier).locate();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _retryAfterSettings();
+  }
+
+  Future<void> _openSettings(LocationStatus status) async {
+    _openedSettings = true;
+    final opened = status == LocationStatus.deniedForever
+        ? await Geolocator.openAppSettings()
+        : await Geolocator.openLocationSettings();
+    if (!opened) _openedSettings = false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(fieldToolsProvider);
     final controller = ref.read(fieldToolsProvider.notifier);
     final l10n = context.l10n;
@@ -34,6 +74,7 @@ class LocationWeatherSheet extends ConsumerWidget {
       _ => _PermissionState(
         status: state.locationStatus,
         onRetry: controller.locate,
+        onOpenSettings: () => _openSettings(state.locationStatus),
       ),
     };
 
@@ -114,7 +155,7 @@ class LocationWeatherSheet extends ConsumerWidget {
                 key: const ValueKey('weather-nearby-load'),
                 onPressed: state.loading
                     ? null
-                    : () => controller.loadWeatherAndNearby(layerId),
+                    : () => controller.loadWeatherAndNearby(widget.layerId),
                 icon: AnimatedSwitcher(
                   duration: AppMotion.of(context, AppMotion.quick),
                   child: state.loading
@@ -326,9 +367,14 @@ class _LocationCard extends StatelessWidget {
 }
 
 class _PermissionState extends StatelessWidget {
-  const _PermissionState({required this.status, required this.onRetry});
+  const _PermissionState({
+    required this.status,
+    required this.onRetry,
+    required this.onOpenSettings,
+  });
   final LocationStatus status;
   final VoidCallback onRetry;
+  final Future<void> Function() onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -349,10 +395,8 @@ class _PermissionState extends StatelessWidget {
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 12),
             OutlinedButton(
-              onPressed: permanent
-                  ? Geolocator.openAppSettings
-                  : status == LocationStatus.serviceDisabled
-                  ? Geolocator.openLocationSettings
+              onPressed: permanent || status == LocationStatus.serviceDisabled
+                  ? onOpenSettings
                   : onRetry,
               child: Text(
                 permanent || status == LocationStatus.serviceDisabled

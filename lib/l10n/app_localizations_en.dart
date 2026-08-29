@@ -1005,11 +1005,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get measureDistanceRequired =>
-      'Add at least 2 points to confirm the distance.';
+      'Tap 1 more point to start measuring distance.';
 
   @override
   String get measureAreaRequired =>
-      'Add at least 3 points to confirm the area.';
+      'Tap more points to create an area measurement.';
 
   @override
   String get routeStartRequired => 'Select a start point on the map.';

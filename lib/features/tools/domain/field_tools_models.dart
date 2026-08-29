@@ -1,10 +1,18 @@
+import 'dart:math' as math;
+
 class GeoCoordinate {
   const GeoCoordinate(this.longitude, this.latitude);
 
   final double longitude;
   final double latitude;
 
-  bool get isInCamPhaBounds => true;
+  bool get isInCamPhaBounds =>
+      longitude.isFinite &&
+      latitude.isFinite &&
+      longitude >= 107 &&
+      longitude <= 108 &&
+      latitude >= 20.7 &&
+      latitude <= 21.3;
 
   List<double> toJson() => [longitude, latitude];
 
@@ -181,6 +189,19 @@ class MeasurementResult {
   final double? lengthMeters;
   final double? areaSquareMeters;
 
+  factory MeasurementResult.preview({
+    required bool area,
+    required List<GeoCoordinate> points,
+  }) => area
+      ? MeasurementResult(
+          geometryType: 'POLYGON',
+          areaSquareMeters: _sphericalPolygonArea(points),
+        )
+      : MeasurementResult(
+          geometryType: 'LINESTRING',
+          lengthMeters: _lineLength(points),
+        );
+
   String get formattedMetricValue {
     final length = lengthMeters;
     if (length != null) {
@@ -208,6 +229,48 @@ class MeasurementResult {
       areaSquareMeters: area,
     );
   }
+}
+
+const _earthRadiusMeters = 6371000.0;
+
+double _lineLength(List<GeoCoordinate> points) {
+  var total = 0.0;
+  for (var index = 1; index < points.length; index++) {
+    final start = points[index - 1];
+    final end = points[index];
+    final latitudeA = start.latitude * math.pi / 180;
+    final latitudeB = end.latitude * math.pi / 180;
+    final latitudeDelta = (end.latitude - start.latitude) * math.pi / 180;
+    final longitudeDelta = (end.longitude - start.longitude) * math.pi / 180;
+    final haversine =
+        math.sin(latitudeDelta / 2) * math.sin(latitudeDelta / 2) +
+        math.cos(latitudeA) *
+            math.cos(latitudeB) *
+            math.sin(longitudeDelta / 2) *
+            math.sin(longitudeDelta / 2);
+    final clampedHaversine = haversine.clamp(0.0, 1.0);
+    total +=
+        _earthRadiusMeters *
+        2 *
+        math.atan2(
+          math.sqrt(clampedHaversine),
+          math.sqrt(1 - clampedHaversine),
+        );
+  }
+  return total;
+}
+
+double _sphericalPolygonArea(List<GeoCoordinate> points) {
+  var sum = 0.0;
+  for (var index = 0; index < points.length; index++) {
+    final current = points[index];
+    final next = points[(index + 1) % points.length];
+    final longitudeDelta = (next.longitude - current.longitude) * math.pi / 180;
+    final latitudeA = current.latitude * math.pi / 180;
+    final latitudeB = next.latitude * math.pi / 180;
+    sum += longitudeDelta * (2 + math.sin(latitudeA) + math.sin(latitudeB));
+  }
+  return (sum * _earthRadiusMeters * _earthRadiusMeters / 2).abs();
 }
 
 Map<String, dynamic> _asMap(Object? value, String key) {

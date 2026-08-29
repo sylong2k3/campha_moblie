@@ -1004,11 +1004,10 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get measureDistanceRequired =>
-      'Thêm ít nhất 2 điểm để xác nhận khoảng cách.';
+      'Chạm thêm 1 điểm để bắt đầu đo khoảng cách.';
 
   @override
-  String get measureAreaRequired =>
-      'Thêm ít nhất 3 điểm để xác nhận diện tích.';
+  String get measureAreaRequired => 'Chạm thêm điểm để tạo vùng đo diện tích.';
 
   @override
   String get routeStartRequired => 'Chọn điểm đầu trên bản đồ.';

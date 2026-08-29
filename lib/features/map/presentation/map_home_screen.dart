@@ -40,9 +40,11 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
   static const _basemapSourceId = 'catalog-basemap-source';
   static const _basemapLayerId = 'catalog-basemap-layer';
   static const _fieldSourceId = 'field-tools-source';
+  static const _fieldLineCasingLayerId = 'field-tools-line-casing';
   static const _fieldLineLayerId = 'field-tools-line';
   static const _fieldFillLayerId = 'field-tools-fill';
   static const _fieldPointLayerId = 'field-tools-points';
+  static const _fieldLabelLayerId = 'field-tools-label';
   static const _fieldTapInteractionId = 'field-tools-map-tap';
   static const _rasterBounds = [106.78441, 20.06150, 107.85559, 22.07171];
 
@@ -55,6 +57,8 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
   bool _styleReady = false;
   bool _mapAuthReady = false;
   bool _loaded = false;
+  bool _fieldOverlaySyncing = false;
+  FieldToolsState? _pendingFieldOverlay;
   String? _error;
   String? _selectedFeatureLabel;
   String? _currentStyleUri;
@@ -747,8 +751,10 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     if (map == null || !_styleReady) return;
     if (state.mode == FieldToolMode.idle) {
       for (final id in const [
+        _fieldLabelLayerId,
         _fieldPointLayerId,
         _fieldLineLayerId,
+        _fieldLineCasingLayerId,
         _fieldFillLayerId,
       ]) {
         try {
@@ -780,6 +786,11 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
         state.routeEnd!,
       ]).toJson();
     }
+    final labelPoint = state.measurement == null || state.vertices.isEmpty
+        ? null
+        : state.mode == FieldToolMode.measureArea
+        ? _measurementAreaLabelPoint(state.vertices)
+        : state.vertices.last;
     final features = <Map<String, dynamic>>[
       if (geometry != null)
         {'type': 'Feature', 'properties': const {}, 'geometry': geometry},
@@ -790,6 +801,15 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
           'geometry': GeoJsonGeometry.point(point).toJson(),
         },
       ),
+      if (labelPoint != null)
+        {
+          'type': 'Feature',
+          'properties': {
+            'kind': 'measurement-label',
+            'label': state.measurement!.formattedMetricValue,
+          },
+          'geometry': GeoJsonGeometry.point(labelPoint).toJson(),
+        },
     ];
     final geoJsonData = jsonEncode({
       'type': 'FeatureCollection',
@@ -810,6 +830,8 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     await map.style.addSource(
       GeoJsonSource(id: _fieldSourceId, data: geoJsonData),
     );
+    const clay = Color(0xFFC66F3D);
+    const clayDark = Color(0xFF5A2A17);
     await map.style.addLayer(
       FillLayer(
         id: _fieldFillLayerId,
@@ -819,9 +841,25 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
           ['geometry-type'],
           'Polygon',
         ],
-        fillColor: AppColors.primaryBright.toARGB32(),
-        fillOpacity: 0.25,
-        fillOutlineColor: AppColors.primaryBright.toARGB32(),
+        fillColor: clay.toARGB32(),
+        fillOpacity: 0.22,
+        fillOutlineColor: clay.toARGB32(),
+      ),
+    );
+    await map.style.addLayer(
+      LineLayer(
+        id: _fieldLineCasingLayerId,
+        sourceId: _fieldSourceId,
+        filter: [
+          '==',
+          ['geometry-type'],
+          'LineString',
+        ],
+        lineColor: clayDark.toARGB32(),
+        lineWidth: 8,
+        lineOpacity: 0.72,
+        lineCap: LineCap.ROUND,
+        lineJoin: LineJoin.ROUND,
       ),
     );
     await map.style.addLayer(
@@ -833,7 +871,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
           ['geometry-type'],
           'LineString',
         ],
-        lineColor: AppColors.primaryBright.toARGB32(),
+        lineColor: clay.toARGB32(),
         lineWidth: 5,
         lineCap: LineCap.ROUND,
         lineJoin: LineJoin.ROUND,
@@ -844,14 +882,44 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
         id: _fieldPointLayerId,
         sourceId: _fieldSourceId,
         filter: [
-          '==',
-          ['geometry-type'],
-          'Point',
+          'all',
+          [
+            '==',
+            ['geometry-type'],
+            'Point',
+          ],
+          [
+            '!=',
+            ['get', 'kind'],
+            'measurement-label',
+          ],
         ],
-        circleColor: AppColors.primaryBright.toARGB32(),
-        circleRadius: 6,
+        circleColor: clay.toARGB32(),
+        circleRadius: 7,
         circleStrokeColor: Colors.white.toARGB32(),
-        circleStrokeWidth: 2,
+        circleStrokeWidth: 2.5,
+      ),
+    );
+    await map.style.addLayer(
+      SymbolLayer(
+        id: _fieldLabelLayerId,
+        sourceId: _fieldSourceId,
+        filter: [
+          '==',
+          ['get', 'kind'],
+          'measurement-label',
+        ],
+        textFieldExpression: ['get', 'label'],
+        textSize: 15,
+        textFont: const ['DIN Pro Medium', 'Arial Unicode MS Regular'],
+        textAllowOverlap: true,
+        textIgnorePlacement: true,
+        textPadding: 8,
+        textOffset: const [0, -1.45],
+        textColor: clayDark.toARGB32(),
+        textHaloColor: Colors.white.toARGB32(),
+        textHaloWidth: 3,
+        textHaloBlur: 0.5,
       ),
     );
   }
@@ -1014,6 +1082,28 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
       ) ??
       Future.value();
 
+  void _queueFieldOverlay(FieldToolsState state) {
+    _pendingFieldOverlay = state;
+    if (_fieldOverlaySyncing) return;
+    _fieldOverlaySyncing = true;
+    unawaited(_drainFieldOverlay());
+  }
+
+  Future<void> _drainFieldOverlay() async {
+    try {
+      while (mounted && _pendingFieldOverlay != null) {
+        final state = _pendingFieldOverlay!;
+        _pendingFieldOverlay = null;
+        await _syncFieldOverlay(state);
+      }
+    } finally {
+      _fieldOverlaySyncing = false;
+      if (mounted && _pendingFieldOverlay != null) {
+        _queueFieldOverlay(_pendingFieldOverlay!);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -1027,7 +1117,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
       unawaited(_syncCatalog(previous, next));
     });
     ref.listen<FieldToolsState>(fieldToolsProvider, (_, next) {
-      unawaited(_syncFieldOverlay(next));
+      _queueFieldOverlay(next);
     });
 
     final activeLayers = catalog.layers
@@ -1375,9 +1465,33 @@ double _toolSheetInitialSize(FieldToolMode mode) => _toolSheetMaxSize(mode);
 
 double _toolSheetMaxSize(FieldToolMode mode) => switch (mode) {
   FieldToolMode.route => 0.24,
-  FieldToolMode.measureDistance || FieldToolMode.measureArea => 0.32,
+  FieldToolMode.measureDistance || FieldToolMode.measureArea => 0.26,
   _ => MapToolDraggableSheet.minChildSize,
 };
+
+GeoCoordinate _measurementAreaLabelPoint(List<GeoCoordinate> points) {
+  var twiceArea = 0.0;
+  var longitudeMoment = 0.0;
+  var latitudeMoment = 0.0;
+  for (var index = 0; index < points.length; index++) {
+    final current = points[index];
+    final next = points[(index + 1) % points.length];
+    final cross =
+        current.longitude * next.latitude - next.longitude * current.latitude;
+    twiceArea += cross;
+    longitudeMoment += (current.longitude + next.longitude) * cross;
+    latitudeMoment += (current.latitude + next.latitude) * cross;
+  }
+  if (twiceArea.abs() > 1e-12) {
+    return GeoCoordinate(
+      longitudeMoment / (3 * twiceArea),
+      latitudeMoment / (3 * twiceArea),
+    );
+  }
+  final longitude = points.fold(0.0, (sum, point) => sum + point.longitude);
+  final latitude = points.fold(0.0, (sum, point) => sum + point.latitude);
+  return GeoCoordinate(longitude / points.length, latitude / points.length);
+}
 
 class _ToolItem {
   const _ToolItem(this.icon, this.title, this.onTap);
