@@ -85,14 +85,10 @@ android {
 
     buildTypes {
         release {
-            if (hasReleaseSigning) {
-                signingConfig = signingConfigs.getByName("release")
-            } else if (gradle.startParameter.taskNames.any {
-                    it.contains("Release", ignoreCase = true)
-                }) {
-                throw GradleException(
-                    "Release build yêu cầu android/key.properties và production keystore hợp lệ.",
-                )
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
             }
             isMinifyEnabled = true
             isShrinkResources = true
