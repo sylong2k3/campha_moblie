@@ -21,6 +21,13 @@
       "type": "dart",
       "program": "lib/main.dart",
       "args": ["--flavor", "prod", "--dart-define-from-file=.env"]
+    },
+    {
+      "name": "Cam Pha GIS (No Flavor)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "args": ["--dart-define-from-file=.env"]
     }
   ]
 }
