@@ -968,16 +968,12 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
   }
 
   Future<void> _openLocationWeather() async {
-    final layerId = ref.read(mapCatalogProvider).activeLayerIds.firstOrNull;
-    final featureId = await showModalBottomSheet<String>(
+    await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (_) => LocationWeatherSheet(layerId: layerId),
+      builder: (_) => const LocationWeatherSheet(),
     );
-    if (featureId != null && layerId != null && mounted) {
-      context.push('/map/feature/$layerId/$featureId');
-    }
   }
 
   void _openMeasure() {

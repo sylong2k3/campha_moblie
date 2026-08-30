@@ -187,22 +187,16 @@ class FieldToolsController extends Notifier<FieldToolsState> {
     }
   }
 
-  Future<void> loadWeatherAndNearby(String? layerId) async {
+  Future<void> loadWeather() async {
     final coordinate = state.location;
     if (coordinate == null) return;
     state = state.copyWith(loading: true, clearError: true);
     try {
       final repository = ref.read(toolsRepositoryProvider);
-      final results = await Future.wait<Object>([
-        repository.getCurrentWeather(coordinate),
-        if (layerId != null)
-          repository.getNearby(layerId: layerId, coordinate: coordinate)
-        else
-          Future.value(const <NearbyFeature>[]),
-      ]);
+      final weather = await repository.getCurrentWeather(coordinate);
       state = state.copyWith(
-        weather: results[0] as WeatherSnapshot,
-        nearby: results[1] as List<NearbyFeature>,
+        weather: weather,
+        nearby: const [],
         loading: false,
       );
     } catch (error) {
@@ -212,6 +206,8 @@ class FieldToolsController extends Notifier<FieldToolsState> {
       );
     }
   }
+
+  Future<void> loadWeatherAndNearby([String? layerId]) => loadWeather();
 
   void startMeasure({required bool area}) {
     _measureRevision++;
