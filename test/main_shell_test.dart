@@ -41,7 +41,7 @@ void main() {
       expect(find.byIcon(Icons.add_location_alt_outlined), findsOneWidget);
       expect(tester.takeException(), isNull);
 
-      await tester.tap(find.text('Cá nhân'));
+      await tester.tap(find.byIcon(Icons.person_outline_rounded));
       await tester.pumpAndSettle();
       expect(find.text('Khám phá với tư cách khách'), findsOneWidget);
       expect(tester.takeException(), isNull);

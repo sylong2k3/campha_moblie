@@ -113,7 +113,8 @@ class MainShell extends StatelessWidget {
               key: const ValueKey('main-navigation-bar'),
               selectedIndex: navigationShell.currentIndex,
               onDestinationSelected: _select,
-              labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+              labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+              animationDuration: const Duration(milliseconds: 300),
               destinations: [
                 for (var index = 0; index < destinations.length; index++)
                   NavigationDestination(

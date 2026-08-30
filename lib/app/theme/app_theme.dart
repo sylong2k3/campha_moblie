@@ -328,23 +328,25 @@ class AppTheme {
         space: 1,
       ),
       navigationBarTheme: NavigationBarThemeData(
-        height: 74,
+        height: 68,
         backgroundColor: colorScheme.surfaceContainer,
         indicatorColor: selectedContainer,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
         indicatorShape: const StadiumBorder(),
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         iconTheme: WidgetStateProperty.resolveWith(
           (states) => IconThemeData(
-            size: states.contains(WidgetState.selected) ? 25 : 23,
+            size: states.contains(WidgetState.selected) ? 24 : 24,
             color: states.contains(WidgetState.selected)
                 ? selectedIndicatorForeground
                 : colorScheme.onSurfaceVariant,
           ),
         ),
         labelTextStyle: WidgetStateProperty.resolveWith(
-          (states) => textTheme.labelSmall?.copyWith(
+          (states) => (textTheme.labelSmall ?? const TextStyle()).copyWith(
+            fontSize: 11,
+            height: 1.1,
             color: states.contains(WidgetState.selected)
                 ? selectedAccent
                 : colorScheme.onSurfaceVariant,

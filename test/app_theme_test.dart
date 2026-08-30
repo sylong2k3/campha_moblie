@@ -50,9 +50,9 @@ void main() {
         expect(_contrast(foreground!, background!), greaterThanOrEqualTo(4.5));
         expect(
           theme.navigationBarTheme.labelBehavior,
-          NavigationDestinationLabelBehavior.alwaysShow,
+          NavigationDestinationLabelBehavior.onlyShowSelected,
         );
-        expect(theme.navigationBarTheme.height, greaterThanOrEqualTo(72));
+        expect(theme.navigationBarTheme.height, greaterThanOrEqualTo(68));
       }
     });
 
