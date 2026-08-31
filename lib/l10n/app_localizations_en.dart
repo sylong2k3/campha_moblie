@@ -779,8 +779,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reportGallery => 'Choose photos';
 
   @override
-  String get reportLocationHint =>
-      'Tap the map to place or adjust the pin inside Cam Pha';
+  String get reportLocationHint => 'Tap the map to place or adjust the pin';
 
   @override
   String get reportDescriptionHint =>
@@ -1049,8 +1048,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reportEvidenceRequired => 'Add at least 1 photo to continue.';
 
   @override
-  String get reportLocationRequired =>
-      'Choose a location inside Cam Pha to continue.';
+  String get reportLocationRequired => 'Choose a location to continue.';
 
   @override
   String get reportDescriptionRequired =>

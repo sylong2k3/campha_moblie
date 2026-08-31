@@ -108,4 +108,22 @@ void main() {
       expect(container.read(reportComposerProvider).media, isEmpty);
     },
   );
+
+  test('allows locations outside Cam Pha bounds in report composer', () async {
+    SharedPreferences.setMockInitialValues({});
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    const outsideLocation = GeoCoordinate(105.85, 21.02); // Hanoi coordinates
+    expect(outsideLocation.isInCamPhaBounds, isFalse);
+
+    await container
+        .read(reportComposerProvider.notifier)
+        .setLocation(outsideLocation);
+
+    final state = container.read(reportComposerProvider);
+    expect(state.location, equals(outsideLocation));
+    expect(state.locationReady, isTrue);
+  });
 }
+

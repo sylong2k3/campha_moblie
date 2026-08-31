@@ -94,7 +94,10 @@ class ReportComposerState {
   final Object? error;
 
   bool get evidenceReady => media.isNotEmpty && media.length <= 5;
-  bool get locationReady => location?.isInCamPhaBounds == true;
+  bool get locationReady =>
+      location != null &&
+      location!.longitude.isFinite &&
+      location!.latitude.isFinite;
   bool get descriptionReady =>
       description.trim().length >= 10 &&
       description.trim().length <= 2000 &&
@@ -237,8 +240,8 @@ class ReportComposerController extends Notifier<ReportComposerState> {
     GeoCoordinate location, {
     double? accuracyMeters,
   }) async {
-    if (!location.isInCamPhaBounds) {
-      throw ArgumentError('Location outside Cam Pha');
+    if (!location.longitude.isFinite || !location.latitude.isFinite) {
+      throw ArgumentError('Invalid coordinate');
     }
     state = state.copyWith(location: location, accuracyMeters: accuracyMeters);
     await _persist();

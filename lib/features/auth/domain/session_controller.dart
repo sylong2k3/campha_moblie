@@ -61,22 +61,33 @@ class SessionController extends Notifier<SessionState> {
     return const SessionState.bootstrapping();
   }
 
+  /// Trần thời gian bootstrap: Keystore của một số OEM (Honor/MagicOS) có thể
+  /// treo không trả về, giữ router mãi ở splash.
+  static const _bootstrapTimeout = Duration(seconds: 15);
+
   Future<void> bootstrap() async {
     state = const SessionState.bootstrapping();
     try {
-      final token = await _tokenStorage.readAccessToken();
+      final token = await _tokenStorage.readAccessToken().timeout(
+        _bootstrapTimeout,
+      );
       if (token == null || token.isEmpty) {
         state = const SessionState.guest();
         return;
       }
-      final user = await ref.read(authRepositoryProvider).getMe();
+      final user = await ref
+          .read(authRepositoryProvider)
+          .getMe()
+          .timeout(_bootstrapTimeout);
       state = SessionState.authenticated(user);
     } on UnauthorizedException catch (error) {
       final ownerId = state.user?.id;
       state = SessionState.guest(error: error);
       await _clearLocalSession(ownerId);
-    } on AppException catch (error) {
-      // Không giả authenticated khi chưa xác minh được token với server.
+    } catch (error) {
+      // Mọi lỗi khác (AppException, PlatformException từ secure storage trên
+      // ROM OEM, TimeoutException) đều phải hạ cánh về guest — không được
+      // giả authenticated, và tuyệt đối không để state kẹt ở bootstrapping.
       state = SessionState.guest(error: error);
     }
   }

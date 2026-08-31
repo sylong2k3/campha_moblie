@@ -781,7 +781,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get reportLocationHint =>
-      'Chạm bản đồ để đặt hoặc điều chỉnh ghim trong phạm vi Cẩm Phả';
+      'Chạm bản đồ để đặt hoặc điều chỉnh ghim vị trí';
 
   @override
   String get reportDescriptionHint => 'Mô tả hiện trạng từ 10 đến 2000 ký tự';
@@ -1046,8 +1046,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get reportEvidenceRequired => 'Thêm ít nhất 1 ảnh để tiếp tục.';
 
   @override
-  String get reportLocationRequired =>
-      'Chọn vị trí trong phạm vi Cẩm Phả để tiếp tục.';
+  String get reportLocationRequired => 'Chọn vị trí để tiếp tục.';
 
   @override
   String get reportDescriptionRequired => 'Nhập mô tả có ít nhất 10 ký tự.';

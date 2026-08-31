@@ -1523,7 +1523,7 @@ abstract class AppLocalizations {
   /// No description provided for @reportLocationHint.
   ///
   /// In vi, this message translates to:
-  /// **'Chạm bản đồ để đặt hoặc điều chỉnh ghim trong phạm vi Cẩm Phả'**
+  /// **'Chạm bản đồ để đặt hoặc điều chỉnh ghim vị trí'**
   String get reportLocationHint;
 
   /// No description provided for @reportDescriptionHint.
@@ -2009,7 +2009,7 @@ abstract class AppLocalizations {
   /// No description provided for @reportLocationRequired.
   ///
   /// In vi, this message translates to:
-  /// **'Chọn vị trí trong phạm vi Cẩm Phả để tiếp tục.'**
+  /// **'Chọn vị trí để tiếp tục.'**
   String get reportLocationRequired;
 
   /// No description provided for @reportDescriptionRequired.

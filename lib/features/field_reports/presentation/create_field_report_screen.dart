@@ -180,12 +180,18 @@ class _CreateFieldReportScreenState
           _locationProblem = null;
         });
       }
-      final position = await geo.Geolocator.getCurrentPosition(
-        locationSettings: const geo.LocationSettings(
-          accuracy: geo.LocationAccuracy.high,
-          timeLimit: Duration(seconds: 15),
-        ),
-      );
+      geo.Position? position;
+      try {
+        position = await geo.Geolocator.getCurrentPosition(
+          locationSettings: const geo.LocationSettings(
+            accuracy: geo.LocationAccuracy.high,
+            timeLimit: Duration(seconds: 10),
+          ),
+        );
+      } catch (_) {
+        position = await geo.Geolocator.getLastKnownPosition();
+        if (position == null) rethrow;
+      }
       await ref
           .read(reportComposerProvider.notifier)
           .setLocation(
@@ -601,8 +607,8 @@ class _LocationStep extends ConsumerStatefulWidget {
 }
 
 class _LocationStepState extends ConsumerState<_LocationStep> {
+  MapboxMap? _map;
   PointAnnotationManager? _manager;
-  bool _outsideBounds = false;
   Uint8List? _markerImage;
   int _markerRenderVersion = 0;
 
@@ -673,11 +679,6 @@ class _LocationStepState extends ConsumerState<_LocationStep> {
   }
 
   Future<void> _selectLocation(GeoCoordinate coordinate) async {
-    if (!coordinate.isInCamPhaBounds) {
-      if (mounted) setState(() => _outsideBounds = true);
-      return;
-    }
-    if (_outsideBounds && mounted) setState(() => _outsideBounds = false);
     await ref.read(reportComposerProvider.notifier).setLocation(coordinate);
   }
 
@@ -685,6 +686,15 @@ class _LocationStepState extends ConsumerState<_LocationStep> {
   void didUpdateWidget(covariant _LocationStep oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.state.location != widget.state.location) {
+      final loc = widget.state.location;
+      if (loc != null) {
+        _map?.flyTo(
+          CameraOptions(
+            center: Point(coordinates: Position(loc.longitude, loc.latitude)),
+          ),
+          MapAnimationOptions(duration: 400),
+        );
+      }
       unawaited(_render());
     }
   }
@@ -715,15 +725,6 @@ class _LocationStepState extends ConsumerState<_LocationStep> {
                   ? context.l10n.commonRetry
                   : context.l10n.locationOpenSettings,
               onAction: widget.onRecover,
-              liveRegion: true,
-            ),
-          ],
-          if (_outsideBounds) ...[
-            const SizedBox(height: 12),
-            AppInlineNotice(
-              message: context.l10n.locationOutsideBounds,
-              icon: Icons.wrong_location_outlined,
-              tone: AppFeedbackTone.error,
               liveRegion: true,
             ),
           ],
@@ -772,6 +773,7 @@ class _LocationStepState extends ConsumerState<_LocationStep> {
                     zoom: 12,
                   ),
                   onMapCreated: (map) async {
+                    _map = map;
                     final manager = await map.annotations
                         .createPointAnnotationManager();
                     if (!mounted) return;
