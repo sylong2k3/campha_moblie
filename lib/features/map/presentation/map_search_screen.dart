@@ -12,6 +12,7 @@ import '../../shared/presentation/app_feedback.dart';
 import '../../shared/presentation/app_search_field.dart';
 import '../data/map_repository.dart';
 import '../domain/layer_model.dart';
+import '../domain/map_controller.dart';
 
 class MapSearchScreen extends ConsumerStatefulWidget {
   const MapSearchScreen({super.key});
@@ -87,6 +88,21 @@ class _MapSearchScreenState extends ConsumerState<MapSearchScreen> {
     final query = _query;
     if (!mounted || query.length < 2 || query.length > 100) return;
     _cancelSearch('superseded');
+
+    final catalog = ref.read(mapCatalogProvider);
+    final activeIds = catalog.activeLayerIds;
+
+    // Tối ưu hiệu năng: Nếu danh mục đã tải và người dùng chưa bật lớp nào
+    // thì không cần gửi request lên backend, trả về rỗng ngay lập tức.
+    if (catalog.layers.isNotEmpty && activeIds.isEmpty) {
+      setState(() {
+        _results = const [];
+        _loading = false;
+        _error = null;
+      });
+      return;
+    }
+
     final token = CancelToken();
     _cancelToken = token;
     setState(() {
@@ -94,17 +110,39 @@ class _MapSearchScreenState extends ConsumerState<MapSearchScreen> {
       _error = null;
     });
     try {
+      // Nếu chỉ có 1 lớp đang bật, truyền layerId để backend chỉ quét đúng bảng đó
+      final singleActiveLayerId = activeIds.length == 1 ? activeIds.first : null;
       final results = await ref
           .read(mapRepositoryProvider)
-          .searchFeatures(query: query, cancelToken: token);
+          .searchFeatures(
+            query: query,
+            layerId: singleActiveLayerId,
+            cancelToken: token,
+          );
       if (!mounted ||
           token.isCancelled ||
           !identical(_cancelToken, token) ||
           query != _query) {
         return;
       }
+
+      // Lọc kết quả chỉ giữ lại các đối tượng thuộc các lớp đang được bật
+      final filteredResults = (catalog.layers.isEmpty || activeIds.isEmpty)
+          ? results
+          : results.where((item) {
+              if (activeIds.contains(item.layerId)) return true;
+              for (final layer in catalog.layers) {
+                if (activeIds.contains(layer.id) &&
+                    (layer.code == item.layerCode ||
+                        layer.nameVi == item.layerName)) {
+                  return true;
+                }
+              }
+              return false;
+            }).toList(growable: false);
+
       setState(() {
-        _results = results;
+        _results = filteredResults;
         _loading = false;
       });
     } on DioException catch (error) {
@@ -129,6 +167,10 @@ class _MapSearchScreenState extends ConsumerState<MapSearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final catalog = ref.watch(mapCatalogProvider);
+    final hasNoActiveLayers =
+        catalog.layers.isNotEmpty && catalog.activeLayerIds.isEmpty;
+
     final groups = <String, List<MapSearchResult>>{};
     for (final item in _results) {
       groups.putIfAbsent(item.layerName, () => []).add(item);
@@ -138,9 +180,10 @@ class _MapSearchScreenState extends ConsumerState<MapSearchScreen> {
       body: SafeArea(
         top: false,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
+              padding: const EdgeInsets.fromLTRB(18, 8, 18, 8),
               child: AppSearchField(
                 key: const ValueKey('map-search-input'),
                 controller: _controller,
@@ -155,11 +198,36 @@ class _MapSearchScreenState extends ConsumerState<MapSearchScreen> {
                 },
               ),
             ),
+            if (catalog.layers.isNotEmpty && catalog.activeCount > 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 0, 22, 8),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.check_circle_outline,
+                      size: 13,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        context.l10n.mapSearchActiveScope(catalog.activeCount),
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Expanded(
               child: AppStateSwitcher(
                 stateKey: ValueKey(
                   _error != null
                       ? 'map-search-error'
+                      : hasNoActiveLayers
+                      ? 'map-search-no-active'
                       : _query.length < 2
                       ? 'map-search-prompt'
                       : !_loading && _results.isEmpty
@@ -174,6 +242,12 @@ class _MapSearchScreenState extends ConsumerState<MapSearchScreen> {
                         title: _error!.localizedErrorMessage(context.l10n),
                         actionLabel: context.l10n.commonRetry,
                         onAction: _search,
+                        liveRegion: true,
+                      )
+                    : hasNoActiveLayers
+                    ? AppStateMessage(
+                        icon: Icons.layers_clear_outlined,
+                        title: context.l10n.mapSearchNoActiveLayers,
                         liveRegion: true,
                       )
                     : _query.length < 2
@@ -203,17 +277,42 @@ class _MapSearchScreenState extends ConsumerState<MapSearchScreen> {
                               child: Column(
                                 children: [
                                   for (final item in group.value)
-                                    ListTile(
-                                      key: ValueKey(
-                                        'map-result-${item.layerId}-${item.featureId}',
-                                      ),
-                                      leading: const Icon(
-                                        Icons.location_on_outlined,
-                                      ),
-                                      title: Text(item.label),
-                                      subtitle: Text(item.layerCode),
-                                      trailing: const Icon(Icons.north_east),
-                                      onTap: () => context.pop(item),
+                                    Builder(
+                                      builder: (context) {
+                                        LayerModel? matchingLayer;
+                                        for (final l in catalog.layers) {
+                                          if (l.id == item.layerId ||
+                                              l.code == item.layerCode) {
+                                            matchingLayer = l;
+                                            break;
+                                          }
+                                        }
+                                        final color = matchingLayer?.displayColor ??
+                                            Theme.of(context).colorScheme.primary;
+                                        final icon = matchingLayer == null
+                                            ? Icons.location_on_outlined
+                                            : matchingLayer.isPoint
+                                            ? Icons.place_outlined
+                                            : matchingLayer.isLine
+                                            ? Icons.timeline
+                                            : Icons.hexagon_outlined;
+
+                                        return ListTile(
+                                          key: ValueKey(
+                                            'map-result-${item.layerId}-${item.featureId}',
+                                          ),
+                                          leading: Icon(
+                                            icon,
+                                            color: color,
+                                          ),
+                                          title: Text(item.label),
+                                          subtitle: Text(
+                                            matchingLayer?.nameVi ?? item.layerCode,
+                                          ),
+                                          trailing: const Icon(Icons.north_east),
+                                          onTap: () => context.pop(item),
+                                        );
+                                      },
                                     ),
                                 ],
                               ),

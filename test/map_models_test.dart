@@ -168,4 +168,44 @@ void main() {
       throwsFormatException,
     );
   });
+
+  test('identifies boundary and hydrology layers while excluding flood overlay', () {
+    final boundary = LayerModel.fromJson({
+      'id': '1',
+      'code': 'ranhgioi_campha',
+      'nameVi': 'Ranh giới Cẩm Phả',
+      'category': 'ranh_gioi',
+      'geometryType': 'MULTILINESTRING',
+      'storageKind': 'postgis',
+      'srid': 4326,
+      'legend': {},
+      'isPublic': true,
+    });
+    final hydro = LayerModel.fromJson({
+      'id': '2',
+      'code': 'song_tieu_thoat_nuoc',
+      'nameVi': 'Sông suối tiêu thoát nước',
+      'category': 'thuy_van',
+      'geometryType': 'LINESTRING',
+      'storageKind': 'postgis',
+      'srid': 4326,
+      'legend': {},
+      'isPublic': true,
+    });
+    final flood = LayerModel.fromJson({
+      'id': '3',
+      'code': 'lop_phu_sau_ngap_2015',
+      'nameVi': 'Lớp phủ sau ngập 2015',
+      'category': 'lop_phu_ngap',
+      'geometryType': 'RASTER',
+      'storageKind': 'geotiff_minio',
+      'srid': 3857,
+      'legend': {},
+      'isPublic': true,
+    });
+
+    expect(boundary.isRaster, isFalse);
+    expect(hydro.isRaster, isFalse);
+    expect(flood.isRaster, isTrue);
+  });
 }

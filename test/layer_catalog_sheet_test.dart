@@ -50,6 +50,44 @@ void main() {
     expect(find.byKey(const ValueKey('layer-toggle-boundary')), findsOneWidget);
     expect(find.byKey(const ValueKey('layer-toggle-flood')), findsNothing);
   });
+
+  testWidgets('enableAll and disableAll toggles all layers', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          mapCatalogProvider.overrideWith(_TestMapCatalogController.new),
+        ],
+        child: MaterialApp(
+          locale: const Locale('vi'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: LayerCatalogSheet()),
+        ),
+      ),
+    );
+
+    // Initial state: 0 active layers -> shows "Bật tất cả", no "Tắt tất cả"
+    expect(find.text('Bật tất cả'), findsOneWidget);
+    expect(find.text('Tắt tất cả'), findsNothing);
+
+    // Tap "Bật tất cả"
+    await tester.tap(find.text('Bật tất cả'));
+    await tester.pumpAndSettle();
+
+    // Now all 2 layers active -> shows "Tắt tất cả", no "Bật tất cả"
+    expect(find.text('2 lớp đang hiển thị'), findsOneWidget);
+    expect(find.text('Tắt tất cả'), findsOneWidget);
+    expect(find.text('Bật tất cả'), findsNothing);
+
+    // Tap "Tắt tất cả"
+    await tester.tap(find.text('Tắt tất cả'));
+    await tester.pumpAndSettle();
+
+    // 0 active layers again
+    expect(find.text('0 lớp đang hiển thị'), findsOneWidget);
+    expect(find.text('Bật tất cả'), findsOneWidget);
+    expect(find.text('Tắt tất cả'), findsNothing);
+  });
 }
 
 class _TestMapCatalogController extends MapCatalogController {

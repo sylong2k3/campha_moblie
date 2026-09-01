@@ -473,6 +473,9 @@ class AppLocalizationsVi extends AppLocalizations {
   String get mapDisableAll => 'Tắt tất cả';
 
   @override
+  String get mapEnableAll => 'Bật tất cả';
+
+  @override
   String get mapLayerSearchHint => 'Tìm lớp dữ liệu';
 
   @override
@@ -501,10 +504,20 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get mapSearchPrompt =>
-      'Nhập ít nhất 2 ký tự để tìm trong các lớp được phép.';
+      'Nhập ít nhất 2 ký tự để tìm trong các lớp đang bật.';
 
   @override
-  String get mapSearchEmpty => 'Không tìm thấy đối tượng phù hợp.';
+  String get mapSearchEmpty =>
+      'Không tìm thấy đối tượng phù hợp trong các lớp đang bật.';
+
+  @override
+  String get mapSearchNoActiveLayers =>
+      'Chưa có lớp dữ liệu nào được bật. Vui lòng bật lớp trên bản đồ để tìm kiếm đối tượng.';
+
+  @override
+  String mapSearchActiveScope(int count) {
+    return 'Đang tìm trong $count lớp đang hiển thị';
+  }
 
   @override
   String get mapFeatureTitle => 'Thông tin đối tượng';

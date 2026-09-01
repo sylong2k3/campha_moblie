@@ -48,7 +48,7 @@ void main() {
     expect(items, defaultFloodLandCoverLegendItems);
   });
 
-  test('getLegendItems returns an empty list for non flood layers with no '
+  test('getLegendItems returns an empty list for non flood line/polygon layers with no '
       'server legend, instead of the flood preset', () {
     final legend = LayerLegend.fromJson({
       'layerId': '2',
@@ -60,6 +60,85 @@ void main() {
     final items = getLegendItems(legend);
 
     expect(items, isEmpty);
+  });
+
+  test('getLegendItems returns point legend item with layer name and color for point layer', () {
+    const pointLayer = LayerModel(
+      id: 'point-1',
+      code: 'diem_ngap',
+      nameVi: 'Điểm ngập úng đô thị',
+      category: 'diem_ngap',
+      geometryType: 'POINT',
+      storageKind: 'postgis',
+      srid: 4326,
+      isPublic: true,
+      legend: {},
+    );
+    final legend = LayerLegend.fromJson({
+      'layerId': 'point-1',
+      'code': 'diem_ngap',
+      'nameVi': 'Điểm ngập úng đô thị',
+      'legend': <String, dynamic>{},
+    });
+
+    final items = getLegendItems(legend, pointLayer);
+
+    expect(items, hasLength(1));
+    expect(items.first.label, 'Điểm ngập úng đô thị');
+    expect(items.first.color, pointLayer.displayColor);
+    expect(items.first.isPoint, isTrue);
+    expect(items.first.isPointGeometry, isTrue);
+  });
+
+  test('getLegendItems returns line and polygon items with appropriate geometryType', () {
+    const lineLayer = LayerModel(
+      id: 'line-1',
+      code: 'ranh_gioi',
+      nameVi: 'Ranh giới hành chính',
+      category: 'ranh_gioi',
+      geometryType: 'LINESTRING',
+      storageKind: 'postgis',
+      srid: 4326,
+      isPublic: true,
+      legend: {},
+    );
+    const polygonLayer = LayerModel(
+      id: 'poly-1',
+      code: 'khu_dan_cu',
+      nameVi: 'Khu dân cư đô thị',
+      category: 'quy_hoach',
+      geometryType: 'POLYGON',
+      storageKind: 'postgis',
+      srid: 4326,
+      isPublic: true,
+      legend: {},
+    );
+
+    final lineLegend = LayerLegend.fromJson({
+      'layerId': 'line-1',
+      'code': 'ranh_gioi',
+      'nameVi': 'Ranh giới hành chính',
+      'legend': <String, dynamic>{},
+    });
+    final polyLegend = LayerLegend.fromJson({
+      'layerId': 'poly-1',
+      'code': 'khu_dan_cu',
+      'nameVi': 'Khu dân cư đô thị',
+      'legend': <String, dynamic>{},
+    });
+
+    final lineItems = getLegendItems(lineLegend, lineLayer);
+    final polyItems = getLegendItems(polyLegend, polygonLayer);
+
+    expect(lineItems, hasLength(1));
+    expect(lineItems.first.label, 'Ranh giới hành chính');
+    expect(lineItems.first.isLineGeometry, isTrue);
+    expect(lineItems.first.color, lineLayer.displayColor);
+
+    expect(polyItems, hasLength(1));
+    expect(polyItems.first.label, 'Khu dân cư đô thị');
+    expect(polyItems.first.isPolygonGeometry, isTrue);
+    expect(polyItems.first.color, polygonLayer.displayColor);
   });
 
   testWidgets(

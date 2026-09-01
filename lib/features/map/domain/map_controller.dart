@@ -120,21 +120,19 @@ class MapCatalogController extends Notifier<MapCatalogState> {
       final retainedActive = state.activeLayerIds.intersection(allowedIds);
       Set<String> defaultActive = retainedActive;
       if (retainedActive.isEmpty && layers.isNotEmpty) {
-        final defaultLayer = layers.firstWhere(
-          (l) => l.code.toLowerCase() == 'ranhgioi_campha',
-          orElse: () => layers.firstWhere(
-            (l) =>
-                l.nameVi.toLowerCase().contains('ranh giới') ||
-                l.nameVi.toLowerCase().contains('ranh gioi') ||
-                l.code.toLowerCase().contains('ranh_gioi') ||
-                l.code.toLowerCase().contains('boundary'),
-            orElse: () => layers.firstWhere(
-              (l) => !l.isRaster,
-              orElse: () => layers.first,
-            ),
-          ),
-        );
-        defaultActive = {defaultLayer.id};
+        final defaultMatching = layers
+            .where(_isDefaultActiveLayer)
+            .map((layer) => layer.id)
+            .toSet();
+        if (defaultMatching.isNotEmpty) {
+          defaultActive = defaultMatching;
+        } else {
+          final fallback = layers.firstWhere(
+            (l) => !l.isRaster,
+            orElse: () => layers.first,
+          );
+          defaultActive = {fallback.id};
+        }
       }
       state = state.copyWith(
         layers: layers,
@@ -180,10 +178,86 @@ class MapCatalogController extends Notifier<MapCatalogState> {
     );
   }
 
+  void enableAll() => state = state.copyWith(
+    activeLayerIds: state.layers.map((l) => l.id).toSet(),
+  );
+
   void disableAll() => state = state.copyWith(activeLayerIds: {});
 
   void selectBasemap(String code) =>
       state = state.copyWith(selectedBasemapCode: code);
+}
+
+bool _isDefaultActiveLayer(LayerModel layer) {
+  if (layer.isRaster) return false;
+
+  final code = layer.code.toLowerCase();
+  final category = layer.category.toLowerCase();
+  final name = layer.nameVi.toLowerCase();
+
+  // Bỏ lớp phủ / ngập
+  final isOverlayOrFlood =
+      code.contains('lop_phu') ||
+      code.contains('lop-phu') ||
+      code.contains('phu_ngap') ||
+      code.contains('ngap') ||
+      code.contains('flood') ||
+      code.contains('cover') ||
+      category.contains('phu') ||
+      category.contains('ngap') ||
+      category.contains('flood') ||
+      name.contains('lớp phủ') ||
+      name.contains('lop phu') ||
+      name.contains('ngập') ||
+      name.contains('ngap');
+  if (isOverlayOrFlood) return false;
+
+  // Lớp ranh giới
+  final isBoundary =
+      code.contains('ranh_gioi') ||
+      code.contains('ranhgioi') ||
+      code.contains('boundary') ||
+      category.contains('ranh_gioi') ||
+      category.contains('ranhgioi') ||
+      category.contains('boundary') ||
+      name.contains('ranh giới') ||
+      name.contains('ranh gioi');
+
+  // Lớp thuỷ hệ / thuỷ văn
+  final isHydro =
+      code.contains('thuy_he') ||
+      code.contains('thuyhe') ||
+      code.contains('thuy_van') ||
+      code.contains('thuyvan') ||
+      code.contains('hydro') ||
+      code.contains('water') ||
+      code.contains('song') ||
+      code.contains('suoi') ||
+      code.contains('kenh') ||
+      code.contains('muong') ||
+      code.contains('ho') ||
+      category.contains('thuy_he') ||
+      category.contains('thuyhe') ||
+      category.contains('thuy_van') ||
+      category.contains('thuyvan') ||
+      category.contains('hydro') ||
+      category.contains('water') ||
+      name.contains('thủy hệ') ||
+      name.contains('thuy he') ||
+      name.contains('thủy văn') ||
+      name.contains('thuy van') ||
+      name.contains('sông') ||
+      name.contains('song') ||
+      name.contains('suối') ||
+      name.contains('suoi') ||
+      name.contains('kênh') ||
+      name.contains('kenh') ||
+      name.contains('mương') ||
+      name.contains('muong') ||
+      name.contains('hồ') ||
+      name.contains('ho');
+
+  return isBoundary || isHydro;
 }
 
 final mapCatalogProvider =

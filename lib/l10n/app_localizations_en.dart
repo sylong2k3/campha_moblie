@@ -471,6 +471,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mapDisableAll => 'Disable all';
 
   @override
+  String get mapEnableAll => 'Enable all';
+
+  @override
   String get mapLayerSearchHint => 'Search data layers';
 
   @override
@@ -499,10 +502,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mapSearchPrompt =>
-      'Enter at least 2 characters to search allowed layers.';
+      'Enter at least 2 characters to search active layers.';
 
   @override
-  String get mapSearchEmpty => 'No matching features found.';
+  String get mapSearchEmpty => 'No matching features found in active layers.';
+
+  @override
+  String get mapSearchNoActiveLayers =>
+      'No layers are currently enabled. Please enable data layers on the map to search.';
+
+  @override
+  String mapSearchActiveScope(int count) {
+    return 'Searching across $count active layers';
+  }
 
   @override
   String get mapFeatureTitle => 'Feature information';

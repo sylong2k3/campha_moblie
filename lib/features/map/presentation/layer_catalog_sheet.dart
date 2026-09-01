@@ -105,11 +105,22 @@ class _LayerCatalogSheetState extends ConsumerState<LayerCatalogSheet> {
                       context.l10n.mapActiveLayers(state.activeCount),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
-                    if (state.activeCount > 0)
-                      TextButton(
-                        onPressed: controller.disableAll,
-                        child: Text(context.l10n.mapDisableAll),
-                      ),
+                    Wrap(
+                      spacing: 4,
+                      children: [
+                        if (state.activeCount < state.layers.length &&
+                            state.layers.isNotEmpty)
+                          TextButton(
+                            onPressed: controller.enableAll,
+                            child: Text(context.l10n.mapEnableAll),
+                          ),
+                        if (state.activeCount > 0)
+                          TextButton(
+                            onPressed: controller.disableAll,
+                            child: Text(context.l10n.mapDisableAll),
+                          ),
+                      ],
+                    ),
                   ],
                 ),
               ],
@@ -291,13 +302,7 @@ class _LayerRow extends ConsumerWidget {
         : layer.isLine
         ? Icons.timeline
         : Icons.hexagon_outlined;
-    // Point phân biệt bằng icon nên giữ màu server/mặc định; line/polygon
-    // phân biệt bằng màu nên lấy tuần tự trong bảng màu, đảm bảo không
-    // trùng nhau trong cùng một category.
-    final color = layer.isPoint
-        ? layer.displayColor
-        : defaultLayerColorPalette[colorIndex %
-              defaultLayerColorPalette.length];
+    final color = layer.displayColor;
     return Column(
       children: [
         SwitchListTile(
@@ -373,23 +378,10 @@ class _LayerRow extends ConsumerWidget {
                       Column(
                         children: items.map((item) {
                           return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            padding: const EdgeInsets.symmetric(vertical: 6),
                             child: Row(
                               children: [
-                                Container(
-                                  width: 24,
-                                  height: 16,
-                                  decoration: BoxDecoration(
-                                    color: item.color,
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.3,
-                                      ),
-                                      width: 0.8,
-                                    ),
-                                  ),
-                                ),
+                                LegendSymbolWidget(item: item, size: 1.2),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(

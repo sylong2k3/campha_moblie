@@ -3,18 +3,33 @@ import 'package:flutter/material.dart';
 /// Màu mặc định khi server không cấu hình màu riêng cho layer.
 const Color defaultLayerColor = Color(0xFF3B82F6);
 
-/// Bảng màu mặc định xoay vòng theo layer để phân biệt trực quan trong danh
-/// sách/legend khi server không cấu hình màu — không gán theo ý nghĩa ngữ
-/// nghĩa, chỉ đơn thuần tránh việc mọi layer trông giống hệt nhau.
+/// Bảng 24 màu phân giải cao, độ tương phản cao để phân biệt rõ ràng giữa các
+/// lớp dữ liệu (point, line, polygon, ranh giới, thủy hệ, công trình...).
 const List<Color> defaultLayerColorPalette = [
-  Color(0xFF3B82F6), // Blue
-  Color(0xFFF59E0B), // Amber
-  Color(0xFF06B6D4), // Cyan
-  Color(0xFF10B981), // Emerald
-  Color(0xFFF97316), // Orange
-  Color(0xFF6366F1), // Indigo
-  Color(0xFF14B8A6), // Teal
-  Color(0xFF84CC16), // Lime
+  Color(0xFFE11D48), // Rose Red (Ranh giới, cảnh báo)
+  Color(0xFF0284C7), // Sky Blue (Thủy hệ, sông hồ)
+  Color(0xFF059669), // Emerald Green (Cây xanh, nông nghiệp, sinh thái)
+  Color(0xFFD97706), // Amber (Giao thông, đường bộ)
+  Color(0xFF7C3AED), // Vivid Purple (Quy hoạch, hành chính)
+  Color(0xFFEA580C), // Deep Orange (Công trình, xây dựng)
+  Color(0xFF0891B2), // Deep Cyan (Thoát nước, thủy văn)
+  Color(0xFFDB2777), // Magenta Pink (Điểm cơ sở, y tế, giáo dục)
+  Color(0xFF0D9488), // Teal (Tài nguyên, môi trường)
+  Color(0xFF65A30D), // Lime (Công viên, mặt bằng xanh)
+  Color(0xFF4F46E5), // Indigo (Dịch vụ công, tiện ích)
+  Color(0xFF9A3412), // Rust Brown (Khai khoáng, bãi than, địa chất)
+  Color(0xFF334155), // Slate (Lưới điện, hạ tầng kỹ thuật)
+  Color(0xFFC026D3), // Fuchsia (Địa chính, khu vực đặc thù)
+  Color(0xFF2563EB), // Royal Blue (Vùng ngập, mặt nước biển)
+  Color(0xFF854D0E), // Bronze (Khu công nghiệp)
+  Color(0xFFF43F5E), // Coral (Khu vực nguy cơ cao)
+  Color(0xFF6B21A8), // Deep Violet (Ranh giới bảo tồn)
+  Color(0xFF16A34A), // Forest Green (Rừng phòng hộ)
+  Color(0xFFB45309), // Amber Brown (Kho bãi, đất trống)
+  Color(0xFF0E7490), // Ocean Blue (Hệ thống cấp nước)
+  Color(0xFFBE185D), // Dark Ruby (Điểm nóng môi trường)
+  Color(0xFF4338CA), // Dark Indigo (Công trình ngầm)
+  Color(0xFF15803D), // Deep Green (Đất canh tác nông nghiệp)
 ];
 
 class LayerModel {

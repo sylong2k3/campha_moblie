@@ -1,7 +1,7 @@
 name: campha_moblie
 description: "Ứng dụng MobileGIS phục vụ quản lý bản đồ và hiện trường thành phố Cẩm Phả."
 publish_to: 'none'
-version: 1.0.0+2
+version: 1.0.0+3
 
 environment:
   sdk: ^3.11.4

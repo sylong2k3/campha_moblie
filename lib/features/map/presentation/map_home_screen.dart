@@ -61,6 +61,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
   FieldToolsState? _pendingFieldOverlay;
   String? _error;
   String? _selectedFeatureLabel;
+  MapSearchResult? _selectedSearchResult;
   String? _currentStyleUri;
   bool _isSyncingCatalog = false;
   bool _needsSyncCatalog = false;
@@ -955,16 +956,28 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
   Future<void> _openSearch() async {
     final result = await context.push<MapSearchResult>('/map/search');
     if (result == null || !mounted) return;
-    setState(() => _selectedFeatureLabel = result.label);
+    setState(() {
+      _selectedFeatureLabel = result.label;
+      _selectedSearchResult = result;
+    });
+
+    // Đảm bảo lớp chứa đối tượng này được bật để hiển thị trên bản đồ
+    ref.read(mapCatalogProvider.notifier).setLayerVisible(result.layerId, true);
+
+    // Đợi hiệu ứng đóng trang tìm kiếm kết thúc để Mapbox GL xử lý flyTo mượt mà
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+    if (!mounted) return;
+
+    final targetPoint = Point(
+      coordinates: Position(result.longitude, result.latitude),
+    );
     await _map?.flyTo(
       CameraOptions(
-        center: Point(coordinates: Position(result.longitude, result.latitude)),
-        zoom: 16,
+        center: targetPoint,
+        zoom: 16.5,
       ),
-      MapAnimationOptions(duration: AppMotion.camera(context, far: true)),
+      MapAnimationOptions(duration: 900),
     );
-    if (!mounted) return;
-    context.push('/map/feature/${result.layerId}/${result.featureId}');
   }
 
   Future<void> _openLocationWeather() async {
@@ -1131,6 +1144,32 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
                 data: (data) => getLegendItems(data, activeFloodLayer),
                 orElse: () => const <LegendColorItem>[],
               );
+    final activeVectorLayers = activeLayers
+        .where((l) => !isFloodLandCoverLayer(l))
+        .toList();
+    final vectorLegendItems = [
+      for (final layer in activeVectorLayers)
+        LegendColorItem(
+          label: layer.nameVi,
+          color: layer.displayColor,
+          geometryType: layer.isPoint
+              ? LegendGeometryType.point
+              : layer.isLine
+                  ? LegendGeometryType.line
+                  : LegendGeometryType.polygon,
+          isPoint: layer.isPoint,
+        ),
+    ];
+    final hasMapLegend = hasFloodLandCover || vectorLegendItems.isNotEmpty;
+    final mapLegendItems = [
+      ...vectorLegendItems,
+      ...floodLegendItems,
+    ];
+    final mapLegendTitle = (activeLayers.length == 1)
+        ? activeLayers.first.nameVi
+        : 'Chú giải lớp bản đồ';
+    final mapLegendKey =
+        'map-legend-${activeLayers.map((l) => l.id).join('-')}';
 
     return Scaffold(
       body: Stack(
@@ -1219,6 +1258,15 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
                                         ),
                                   ),
                                 ),
+                                if (_selectedFeatureLabel != null)
+                                  IconButton(
+                                    tooltip: 'Bỏ chọn',
+                                    icon: const Icon(Icons.close, size: 18),
+                                    onPressed: () => setState(() {
+                                      _selectedFeatureLabel = null;
+                                      _selectedSearchResult = null;
+                                    }),
+                                  ),
                                 Container(
                                   width: 1,
                                   height: 24,
@@ -1305,19 +1353,121 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
                       ),
                     ),
                     const Spacer(),
+                    if (_selectedSearchResult != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHigh
+                                .withValues(alpha: 0.95),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .outlineVariant
+                                  .withValues(alpha: 0.6),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.15),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .primaryContainer,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.location_on,
+                                  color: Theme.of(context).colorScheme.primary,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _selectedSearchResult!.label,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _selectedSearchResult!.layerName,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant,
+                                          ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              FilledButton.tonal(
+                                style: FilledButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                ),
+                                onPressed: () {
+                                  context.push(
+                                    '/map/feature/${_selectedSearchResult!.layerId}/${_selectedSearchResult!.featureId}',
+                                  );
+                                },
+                                child: const Text('Chi tiết'),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close, size: 18),
+                                onPressed: () {
+                                  setState(() {
+                                    _selectedSearchResult = null;
+                                    _selectedFeatureLabel = null;
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     AnimatedSwitcher(
                       duration: AppMotion.of(context, AppMotion.surface),
                       reverseDuration: AppMotion.of(context, AppMotion.state),
                       transitionBuilder: AppMotion.stateTransition,
-                      child: hasFloodLandCover && _showLegendCard
+                      child: hasMapLegend && _showLegendCard
                           ? Padding(
-                              key: ValueKey(
-                                'map-legend-${activeFloodLayer.id}',
-                              ),
+                              key: ValueKey(mapLegendKey),
                               padding: const EdgeInsets.only(bottom: 10),
                               child: LayerLegendCard(
-                                title: activeFloodLayer.nameVi,
-                                items: floodLegendItems,
+                                title: mapLegendTitle,
+                                items: mapLegendItems,
                                 onClose: () =>
                                     setState(() => _showLegendCard = false),
                               ),
@@ -1329,7 +1479,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        if (hasFloodLandCover) ...[
+                        if (hasMapLegend) ...[
                           IconButton.filledTonal(
                             key: const ValueKey('map-legend-toggle'),
                             tooltip: 'Chú giải',

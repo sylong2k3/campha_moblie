@@ -32,7 +32,10 @@ class ApiConfig {
   static String get appVersion => _value(_defineAppVersion, '1.0.0');
   static String get baseUrl =>
       _value(_defineBaseUrl, 'https://apicampha.tourismpj.pro.vn/api/v1');
-  static String get geoserverUrl => _value(_defineGeoserverUrl);
+  static String get geoserverUrl => _value(
+    _defineGeoserverUrl,
+    'https://geoserver.humgsoftware.pro.vn/geoserver',
+  );
   static String get googleClientId => _value(_defineGoogleClientId);
 
   static bool get verboseLogging =>

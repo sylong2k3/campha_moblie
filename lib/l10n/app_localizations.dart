@@ -974,6 +974,12 @@ abstract class AppLocalizations {
   /// **'Tắt tất cả'**
   String get mapDisableAll;
 
+  /// No description provided for @mapEnableAll.
+  ///
+  /// In vi, this message translates to:
+  /// **'Bật tất cả'**
+  String get mapEnableAll;
+
   /// No description provided for @mapLayerSearchHint.
   ///
   /// In vi, this message translates to:
@@ -1031,14 +1037,26 @@ abstract class AppLocalizations {
   /// No description provided for @mapSearchPrompt.
   ///
   /// In vi, this message translates to:
-  /// **'Nhập ít nhất 2 ký tự để tìm trong các lớp được phép.'**
+  /// **'Nhập ít nhất 2 ký tự để tìm trong các lớp đang bật.'**
   String get mapSearchPrompt;
 
   /// No description provided for @mapSearchEmpty.
   ///
   /// In vi, this message translates to:
-  /// **'Không tìm thấy đối tượng phù hợp.'**
+  /// **'Không tìm thấy đối tượng phù hợp trong các lớp đang bật.'**
   String get mapSearchEmpty;
+
+  /// No description provided for @mapSearchNoActiveLayers.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chưa có lớp dữ liệu nào được bật. Vui lòng bật lớp trên bản đồ để tìm kiếm đối tượng.'**
+  String get mapSearchNoActiveLayers;
+
+  /// No description provided for @mapSearchActiveScope.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang tìm trong {count} lớp đang hiển thị'**
+  String mapSearchActiveScope(int count);
 
   /// No description provided for @mapFeatureTitle.
   ///
