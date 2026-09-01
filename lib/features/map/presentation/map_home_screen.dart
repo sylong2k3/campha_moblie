@@ -411,6 +411,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
             scheme: Scheme.XYZ,
             minzoom: layer.minZoom ?? 0,
             maxzoom: layer.maxZoom ?? 22,
+            volatile: true,
           ),
         );
         await map.style.addLayer(

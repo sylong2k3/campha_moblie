@@ -26,6 +26,18 @@ Future<void> main() async {
   await runZonedGuarded(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+
+      // Tối ưu RAM theo chính sách Google Play & thiết bị Low-RAM:
+      // Giới hạn bộ đệm ảnh trong RAM (mặc định 1000 ảnh / 100MB) xuống 100 ảnh / 25MB.
+      PaintingBinding.instance.imageCache.maximumSize = 100;
+      PaintingBinding.instance.imageCache.maximumSizeBytes = 25 * 1024 * 1024;
+
+      // Giải phóng bộ đệm ảnh khi app chuyển vào nền để tránh bị Android Low Memory Killer thu hồi
+      AppLifecycleListener(
+        onHide: () => PaintingBinding.instance.imageCache.clearLiveImages(),
+        onPause: () => PaintingBinding.instance.imageCache.clear(),
+      );
+
       LicenseRegistry.addLicense(() async* {
         final license = await rootBundle.loadString('assets/fonts/OFL.txt');
         yield LicenseEntryWithLineBreaks(['Be Vietnam Pro'], license);
