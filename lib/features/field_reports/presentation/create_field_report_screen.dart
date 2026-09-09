@@ -29,7 +29,8 @@ class CreateFieldReportScreen extends ConsumerStatefulWidget {
 enum _LocationProblem { serviceDisabled, denied, deniedForever }
 
 class _CreateFieldReportScreenState
-    extends ConsumerState<CreateFieldReportScreen> {
+    extends ConsumerState<CreateFieldReportScreen>
+    with WidgetsBindingObserver {
   final _picker = picker.ImagePicker();
   final _descriptionController = TextEditingController();
   final _descriptionFocus = FocusNode();
@@ -42,7 +43,24 @@ class _CreateFieldReportScreenState
   _LocationProblem? _locationProblem;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// `openLocationSettings()`/`openAppSettings()` trả về ngay khi mở màn hình
+  /// Cài đặt, không đợi người dùng thao tác xong — nên banner lỗi sẽ đứng yên
+  /// dù GPS/quyền đã được bật. Kiểm tra lại khi app quay về foreground.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _locationProblem != null) {
+      unawaited(_locate());
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _descriptionController.dispose();
     _descriptionFocus.dispose();
     _truthFocus.dispose();
@@ -155,11 +173,15 @@ class _CreateFieldReportScreenState
       }
       var permission = await geo.Geolocator.checkPermission();
       if (permission == geo.LocationPermission.denied) {
-        final proceed = await _confirmPermission(
-          title: l10n.locationWeatherTitle,
-          body: l10n.locationPrimer,
-        );
-        if (!proceed || !mounted) return;
+        // Không hỏi lại primer khi người dùng vừa quay về từ Cài đặt hệ thống:
+        // họ đã ở giữa luồng khắc phục, dialog thứ hai chỉ gây rối.
+        if (_locationProblem == null) {
+          final proceed = await _confirmPermission(
+            title: l10n.locationWeatherTitle,
+            body: l10n.locationPrimer,
+          );
+          if (!proceed || !mounted) return;
+        }
         permission = await geo.Geolocator.requestPermission();
       }
       if (permission == geo.LocationPermission.deniedForever) {
@@ -213,6 +235,7 @@ class _CreateFieldReportScreenState
     switch (_locationProblem) {
       case _LocationProblem.serviceDisabled:
         await geo.Geolocator.openLocationSettings();
+        // didChangeAppLifecycleState kiểm tra lại khi người dùng quay về.
         return;
       case _LocationProblem.deniedForever:
         await geo.Geolocator.openAppSettings();

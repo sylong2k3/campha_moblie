@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:campha_moblie/app/theme/app_motion.dart';
@@ -22,13 +23,43 @@ class FieldReportsScreen extends ConsumerStatefulWidget {
   ConsumerState<FieldReportsScreen> createState() => _FieldReportsScreenState();
 }
 
+typedef _NearbySelection = ({DateTime from, DateTime to, int radius});
+
 class _FieldReportsScreenState extends ConsumerState<FieldReportsScreen>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   bool _mapMode = false;
   bool _nearbyPending = false;
 
+  /// Lựa chọn đang dang dở khi người dùng được đưa sang Cài đặt hệ thống —
+  /// giữ lại để chạy tiếp lúc quay về, khỏi bắt chọn lại bộ lọc.
+  _NearbySelection? _pendingSelection;
+  bool _openedSettings = false;
+
   @override
   bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// `openLocationSettings()`/`openAppSettings()` trả về ngay khi mở màn hình
+  /// Cài đặt, không đợi người dùng bật xong — phải kiểm tra lại lúc resume.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || !_openedSettings) return;
+    _openedSettings = false;
+    final selection = _pendingSelection;
+    _pendingSelection = null;
+    if (selection != null) unawaited(_applyNearby(selection));
+  }
 
   List<FieldReport> _effectiveItems(FieldReportsState state) {
     final items = state.filter.nearbyLocation == null
@@ -43,18 +74,21 @@ class _FieldReportsScreenState extends ConsumerState<FieldReportsScreen>
   Future<void> _nearby() async {
     final current = ref.read(fieldReportsProvider).filter;
     final now = DateTime.now().toUtc();
-    final selection =
-        await showModalBottomSheet<({DateTime from, DateTime to, int radius})>(
-          context: context,
-          showDragHandle: true,
-          isScrollControlled: true,
-          builder: (context) => _NearbyFilterSheet(
-            initialFrom: current.from ?? now.subtract(const Duration(days: 30)),
-            initialTo: current.to ?? now,
-            initialRadius: current.radiusMeters.clamp(10, 500),
-          ),
-        );
+    final selection = await showModalBottomSheet<_NearbySelection>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => _NearbyFilterSheet(
+        initialFrom: current.from ?? now.subtract(const Duration(days: 30)),
+        initialTo: current.to ?? now,
+        initialRadius: current.radiusMeters.clamp(10, 500),
+      ),
+    );
     if (selection == null || !mounted) return;
+    await _applyNearby(selection);
+  }
+
+  Future<void> _applyNearby(_NearbySelection selection) async {
     setState(() => _nearbyPending = true);
     try {
       if (!await geo.Geolocator.isLocationServiceEnabled()) {
@@ -62,6 +96,7 @@ class _FieldReportsScreenState extends ConsumerState<FieldReportsScreen>
           await _showLocationRecovery(
             context.l10n.locationServiceOff,
             geo.Geolocator.openLocationSettings,
+            selection,
           );
         }
         return;
@@ -76,6 +111,7 @@ class _FieldReportsScreenState extends ConsumerState<FieldReportsScreen>
           await _showLocationRecovery(
             context.l10n.locationDeniedForever,
             geo.Geolocator.openAppSettings,
+            selection,
           );
         }
         return;
@@ -85,6 +121,7 @@ class _FieldReportsScreenState extends ConsumerState<FieldReportsScreen>
           await _showLocationRecovery(
             context.l10n.locationDenied,
             geo.Geolocator.openAppSettings,
+            selection,
           );
         }
         return;
@@ -138,6 +175,7 @@ class _FieldReportsScreenState extends ConsumerState<FieldReportsScreen>
   Future<void> _showLocationRecovery(
     String message,
     Future<bool> Function() openSettings,
+    _NearbySelection selection,
   ) async {
     final open = await showDialog<bool>(
       context: context,
@@ -156,7 +194,14 @@ class _FieldReportsScreenState extends ConsumerState<FieldReportsScreen>
         ],
       ),
     );
-    if (open == true) await openSettings();
+    if (open != true) return;
+    _pendingSelection = selection;
+    _openedSettings = true;
+    if (!await openSettings()) {
+      // Không mở được Cài đặt → không có sự kiện resume nào để chạy tiếp.
+      _openedSettings = false;
+      _pendingSelection = null;
+    }
   }
 
   void _openProtected(String path) {

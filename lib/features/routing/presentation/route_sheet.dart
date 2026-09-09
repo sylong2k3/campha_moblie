@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart' as geo;
@@ -17,8 +19,32 @@ class RouteSheet extends ConsumerStatefulWidget {
   ConsumerState<RouteSheet> createState() => _RouteSheetState();
 }
 
-class _RouteSheetState extends ConsumerState<RouteSheet> {
+class _RouteSheetState extends ConsumerState<RouteSheet>
+    with WidgetsBindingObserver {
   bool? _editing;
+  bool _openedSettings = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// `openLocationSettings()`/`openAppSettings()` trả về ngay khi mở màn hình
+  /// Cài đặt, không đợi người dùng bật xong — phải định vị lại lúc resume,
+  /// nếu không banner lỗi sẽ đứng yên dù GPS đã bật.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || !_openedSettings) return;
+    _openedSettings = false;
+    unawaited(ref.read(fieldToolsProvider.notifier).locate());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -149,6 +175,7 @@ class _RouteSheetState extends ConsumerState<RouteSheet> {
             _LocationRecovery(
               state: state,
               retry: () => _useGps(context, controller),
+              openSettings: (open) => unawaited(_openSettingsAndRetry(open)),
             ),
           ] else if (state.error case final error?) ...[
             const SizedBox(height: 8),
@@ -287,15 +314,31 @@ class _RouteSheetState extends ConsumerState<RouteSheet> {
         ],
       ),
     );
-    if (open == true) await openSettings();
+    if (open != true) return;
+    _openedSettings = true;
+    // Không mở được Cài đặt → không có sự kiện resume nào để thử lại.
+    if (!await openSettings()) _openedSettings = false;
+  }
+
+  /// Dùng chung cho banner lỗi inline — mở Cài đặt nhưng vẫn đăng ký thử lại.
+  Future<void> _openSettingsAndRetry(
+    Future<bool> Function() openSettings,
+  ) async {
+    _openedSettings = true;
+    if (!await openSettings()) _openedSettings = false;
   }
 }
 
 class _LocationRecovery extends StatelessWidget {
-  const _LocationRecovery({required this.state, required this.retry});
+  const _LocationRecovery({
+    required this.state,
+    required this.retry,
+    required this.openSettings,
+  });
 
   final FieldToolsState state;
   final VoidCallback retry;
+  final ValueChanged<Future<bool> Function()> openSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -316,11 +359,13 @@ class _LocationRecovery extends StatelessWidget {
         ),
         const SizedBox(width: 6),
         TextButton(
-          onPressed: state.locationStatus == LocationStatus.serviceDisabled
-              ? geo.Geolocator.openLocationSettings
-              : state.locationStatus == LocationStatus.deniedForever
-              ? geo.Geolocator.openAppSettings
-              : retry,
+          onPressed: switch (state.locationStatus) {
+            LocationStatus.serviceDisabled => () =>
+              openSettings(geo.Geolocator.openLocationSettings),
+            LocationStatus.deniedForever => () =>
+              openSettings(geo.Geolocator.openAppSettings),
+            _ => retry,
+          },
           child: Text(
             state.locationStatus == LocationStatus.denied
                 ? l10n.commonRetry
