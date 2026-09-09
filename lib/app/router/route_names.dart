@@ -22,6 +22,8 @@ class RouteNames {
   static const pdfMapDetail = 'pdf-map-detail';
   static const profile = 'profile';
   static const changePassword = 'change-password';
+  static const notifications = 'notifications';
+  static const notificationReportDetail = 'notification-report-detail';
 }
 
 class RoutePaths {
@@ -51,4 +53,7 @@ class RoutePaths {
   static String pdfMapDetail(String id) => '/documents/pdf/$id';
   static const profile = '/profile';
   static const changePassword = '/profile/change-password';
+  static const notifications = '/notifications';
+  static String notificationReportDetail(String id) =>
+      '/notifications/report/$id';
 }

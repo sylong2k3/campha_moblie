@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
 
+import '../../../core/error/app_exception.dart';
 import '../../../core/error/error_mapper.dart';
+import '../../../core/location/location_helper.dart';
 import '../../routing/data/routing_repository.dart';
 import '../../routing/domain/route_model.dart';
 import '../data/tools_repository.dart';
@@ -17,7 +20,6 @@ enum LocationStatus {
   serviceDisabled,
   denied,
   deniedForever,
-  outsideBounds,
 }
 
 class FieldToolsState {
@@ -139,37 +141,29 @@ class FieldToolsController extends Notifier<FieldToolsState> {
       clearError: true,
     );
     try {
-      if (!await Geolocator.isLocationServiceEnabled()) {
+      final result = await getCurrentLocation();
+      if (!result.isSuccess) {
+        final status = switch (result.failure!) {
+          LocationFailure.serviceDisabled => LocationStatus.serviceDisabled,
+          LocationFailure.permissionDenied => LocationStatus.denied,
+          LocationFailure.permissionDeniedForever =>
+            LocationStatus.deniedForever,
+          LocationFailure.timeout ||
+          LocationFailure.unavailable => LocationStatus.idle,
+        };
         state = state.copyWith(
-          locationStatus: LocationStatus.serviceDisabled,
+          locationStatus: status,
           loading: false,
+          error:
+              (result.failure == LocationFailure.timeout ||
+                      result.failure == LocationFailure.unavailable)
+                  ? const NetworkException('Không thể xác định vị trí lúc này')
+                  : null,
         );
         return;
       }
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.deniedForever) {
-        state = state.copyWith(
-          locationStatus: LocationStatus.deniedForever,
-          loading: false,
-        );
-        return;
-      }
-      if (permission == LocationPermission.denied) {
-        state = state.copyWith(
-          locationStatus: LocationStatus.denied,
-          loading: false,
-        );
-        return;
-      }
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 15),
-        ),
-      );
+
+      final position = result.position!;
       final coordinate = GeoCoordinate(position.longitude, position.latitude);
       state = state.copyWith(
         locationStatus: LocationStatus.ready,
@@ -178,6 +172,7 @@ class FieldToolsController extends Notifier<FieldToolsState> {
         locationTime: position.timestamp,
         loading: false,
       );
+      unawaited(loadWeather());
     } catch (error) {
       state = state.copyWith(
         locationStatus: LocationStatus.idle,
@@ -362,14 +357,43 @@ class FieldToolsController extends Notifier<FieldToolsState> {
     }
   }
 
+  void setGpsLocation({
+    required GeoCoordinate coordinate,
+    required double accuracyMeters,
+    required DateTime timestamp,
+  }) {
+    if (!coordinate.isValid || !accuracyMeters.isFinite || accuracyMeters < 0) {
+      return;
+    }
+    state = state.copyWith(
+      locationStatus: LocationStatus.ready,
+      location: coordinate,
+      accuracyMeters: accuracyMeters,
+      locationTime: timestamp,
+      loading: false,
+      clearError: true,
+    );
+    if (state.weather == null && !state.loading) {
+      unawaited(loadWeather());
+    }
+  }
+
   void useLocationAsRouteStart() {
     final location = state.location;
-    if (location != null && location.isInCamPhaBounds) {
-      state = state.copyWith(
-        routeStart: location,
-        clearRouteResult: true,
-        clearError: true,
-      );
+    if (location != null) {
+      if (location.isInCamPhaBounds) {
+        state = state.copyWith(
+          routeStart: location,
+          clearRouteResult: true,
+          clearError: true,
+        );
+      } else {
+        state = state.copyWith(
+          error: const ValidationException(
+            'Điểm xuất phát phải nằm trong phạm vi Cẩm Phả',
+          ),
+        );
+      }
     }
   }
 
@@ -378,7 +402,9 @@ class FieldToolsController extends Notifier<FieldToolsState> {
     required double accuracyMeters,
     required DateTime timestamp,
   }) {
-    if (!position.isInCamPhaBounds) return;
+    if (!position.isValid || !accuracyMeters.isFinite || accuracyMeters < 0) {
+      return;
+    }
     final route = state.route;
     final nextIndex = route == null
         ? state.activeRouteStepIndex

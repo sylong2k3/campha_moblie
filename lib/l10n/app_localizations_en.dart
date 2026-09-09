@@ -15,6 +15,55 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonRetry => 'Try again';
 
   @override
+  String get notificationsTitle => 'Notifications';
+
+  @override
+  String get notificationsAll => 'All';
+
+  @override
+  String get notificationsUnread => 'Unread';
+
+  @override
+  String get notificationsMarkAllRead => 'Mark all as read';
+
+  @override
+  String get notificationsLoadError =>
+      'Could not load notifications. Please try again.';
+
+  @override
+  String get notificationsActionError => 'Action failed. Please try again.';
+
+  @override
+  String get notificationsEmpty => 'No notifications yet';
+
+  @override
+  String get notificationsUnreadEmpty => 'No unread notifications';
+
+  @override
+  String get notificationsLoadMore => 'Load more';
+
+  @override
+  String get notificationsDelete => 'Delete notification';
+
+  @override
+  String get notificationsDeleteConfirm =>
+      'Delete this notification? This action cannot be undone.';
+
+  @override
+  String get notificationsJustNow => 'Just now';
+
+  @override
+  String notificationsDaysAgo(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count days ago',
+      one: '1 day ago',
+    );
+    return '$_temp0';
+  }
+
+  @override
   String get commonCancel => 'Cancel';
 
   @override

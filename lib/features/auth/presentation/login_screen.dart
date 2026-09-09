@@ -284,8 +284,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 }
 
-const _testAccountPassword = String.fromEnvironment('TEST_ACCOUNT_PASSWORD');
-const _testLoginEnabled = bool.fromEnvironment('ENABLE_TEST_LOGIN');
+const _defaultDemoPassword = 'CamPha@2026';
+const _testAccountPassword = String.fromEnvironment(
+  'TEST_ACCOUNT_PASSWORD',
+  defaultValue: _defaultDemoPassword,
+);
+const _testLoginEnabled = bool.fromEnvironment(
+  'ENABLE_TEST_LOGIN',
+  defaultValue: true,
+);
 
 class _TestAccount {
   const _TestAccount({
@@ -350,22 +357,22 @@ class _TestAccountsStrip extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.science_outlined, size: 17, color: colors.tertiary),
+              Icon(Icons.badge_outlined, size: 18, color: colors.primary),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  'Đăng nhập nhanh',
+                  'Tài khoản mẫu trải nghiệm',
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: colors.tertiary,
+                    color: colors.primary,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
               Text(
-                '${kDebugMode ? 'DEBUG' : 'TEST'}  •  Kéo ngang',
+                'Kéo ngang',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: colors.onSurfaceVariant,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
@@ -386,8 +393,8 @@ class _TestAccountsStrip extends StatelessWidget {
                         onPressed: enabled ? () => onSelected(account) : null,
                         style: OutlinedButton.styleFrom(
                           visualDensity: VisualDensity.compact,
-                          backgroundColor: colors.tertiaryContainer.withValues(
-                            alpha: 0.42,
+                          backgroundColor: colors.primaryContainer.withValues(
+                            alpha: 0.28,
                           ),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
@@ -405,15 +412,30 @@ class _TestAccountsStrip extends StatelessWidget {
               ],
             ),
           ),
-          if (!passwordConfigured) ...[
-            const SizedBox(height: 6),
-            Text(
-              'Thiếu TEST_ACCOUNT_PASSWORD; nút chỉ điền email.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: colors.error),
-            ),
-          ],
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Icon(
+                passwordConfigured
+                    ? Icons.lock_open_outlined
+                    : Icons.info_outline,
+                size: 13,
+                color: colors.onSurfaceVariant,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  passwordConfigured
+                      ? 'Mật khẩu mẫu: $_defaultDemoPassword (chạm vai trò để đăng nhập ngay)'
+                      : 'Chạm để tự động điền email vai trò kiểm thử.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

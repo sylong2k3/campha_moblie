@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/error/app_exception.dart';
+import '../../../core/error/crashlytics_service.dart';
 import '../../../core/push/push_coordinator.dart';
 import '../../../core/storage/token_storage.dart';
 import '../../cms/domain/paged_controller.dart';
@@ -11,6 +12,7 @@ import '../../feature_edit/domain/feature_sync_controller.dart';
 import '../../field_reports/domain/field_reports_controller.dart';
 import '../../field_reports/domain/report_composer_controller.dart';
 import '../../map/domain/map_controller.dart';
+import '../../notifications/domain/notification_controller.dart';
 import '../../tools/domain/field_tools_controller.dart';
 import '../data/auth_repository.dart';
 import 'auth_result.dart';
@@ -55,14 +57,22 @@ class SessionController extends Notifier<SessionState> {
   @override
   SessionState build() {
     _tokenStorage = ref.watch(tokenStorageProvider);
+    listenSelf((_, next) {
+      final user = next.isAuthenticated ? next.user : null;
+      unawaited(
+        user == null
+            ? CrashlyticsService.clearUser()
+            : CrashlyticsService.setUser(id: user.id, role: user.roleCode),
+      );
+    });
     _tokenStorage.addClearListener(_onTokensCleared);
     ref.onDispose(() => _tokenStorage.removeClearListener(_onTokensCleared));
     Future.microtask(bootstrap);
     return const SessionState.bootstrapping();
   }
 
-  /// Trần thời gian bootstrap: Keystore của một số OEM (Honor/MagicOS) có thể
-  /// treo không trả về, giữ router mãi ở splash.
+  /// Tráº§n thá»i gian bootstrap: Keystore cá»§a má»™t sá»‘ OEM (Honor/MagicOS) cÃ³ thá»ƒ
+  /// treo khÃ´ng tráº£ vá», giá»¯ router mÃ£i á»Ÿ splash.
   static const _bootstrapTimeout = Duration(seconds: 15);
 
   Future<void> bootstrap() async {
@@ -85,9 +95,9 @@ class SessionController extends Notifier<SessionState> {
       state = SessionState.guest(error: error);
       await _clearLocalSession(ownerId);
     } catch (error) {
-      // Mọi lỗi khác (AppException, PlatformException từ secure storage trên
-      // ROM OEM, TimeoutException) đều phải hạ cánh về guest — không được
-      // giả authenticated, và tuyệt đối không để state kẹt ở bootstrapping.
+      // Má»i lá»—i khÃ¡c (AppException, PlatformException tá»« secure storage trÃªn
+      // ROM OEM, TimeoutException) Ä‘á»u pháº£i háº¡ cÃ¡nh vá» guest â€” khÃ´ng Ä‘Æ°á»£c
+      // giáº£ authenticated, vÃ  tuyá»‡t Ä‘á»‘i khÃ´ng Ä‘á»ƒ state káº¹t á»Ÿ bootstrapping.
       state = SessionState.guest(error: error);
     }
   }
@@ -100,6 +110,7 @@ class SessionController extends Notifier<SessionState> {
         .read(authRepositoryProvider)
         .login(email: email, password: password);
     state = SessionState.authenticated(result.user);
+
     return result;
   }
 
@@ -149,12 +160,12 @@ class SessionController extends Notifier<SessionState> {
     try {
       await ref.read(appPushCoordinatorProvider).unregisterDevice();
     } catch (_) {
-      // Logout local vẫn phải hoàn tất khi unregister push lỗi.
+      // Logout local váº«n pháº£i hoÃ n táº¥t khi unregister push lá»—i.
     }
     try {
       await ref.read(authRepositoryProvider).logout();
     } catch (_) {
-      // Server logout best effort; token và dữ liệu local vẫn bị xóa bên dưới.
+      // Server logout best effort; token vÃ  dá»¯ liá»‡u local váº«n bá»‹ xÃ³a bÃªn dÆ°á»›i.
     } finally {
       await _clearLocalSession(ownerId);
     }
@@ -177,6 +188,7 @@ class SessionController extends Notifier<SessionState> {
 
   Future<void> _clearLocalSession(String? ownerId) async {
     state = const SessionState.guest();
+
     _cleaningSession = true;
     try {
       await _tokenStorage.clear();
@@ -214,13 +226,15 @@ class SessionController extends Notifier<SessionState> {
       () => ref.invalidate(documentListProvider),
       () => ref.invalidate(pdfMapListProvider),
       () => ref.invalidate(mapCatalogProvider),
+      () => ref.invalidate(notificationListControllerProvider),
+      () => ref.invalidate(unreadNotificationCountProvider),
       () => ref.read(fieldReportsProvider.notifier).clearSensitiveState(),
       () => ref.read(fieldToolsProvider.notifier).clearSensitiveState(),
     ]) {
       try {
         cleanup();
       } catch (_) {
-        // Mỗi cache/state riêng tư được dọn độc lập.
+        // Má»—i cache/state riÃªng tÆ° Ä‘Æ°á»£c dá»n Ä‘á»™c láº­p.
       }
     }
   }

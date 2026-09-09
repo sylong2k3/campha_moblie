@@ -110,4 +110,12 @@ void main() {
       );
     }
   });
+
+  test('FieldReport.fromJson handles null photo_count gracefully', () {
+    final parsed = FieldReport.fromJson({
+      ...report(),
+      'photo_count': null,
+    });
+    expect(parsed.photoCount, 0);
+  });
 }

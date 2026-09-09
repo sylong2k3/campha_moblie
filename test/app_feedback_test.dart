@@ -449,7 +449,9 @@ void main() {
   testWidgets('debug login shows horizontal role strip below forgot password', (
     tester,
   ) async {
-    await tester.pumpWidget(const _LocalizedApp(home: LoginScreen()));
+    await tester.pumpWidget(
+      const _LocalizedApp(home: LoginScreen(debugTestAccountPassword: '')),
+    );
 
     final panel = find.byKey(const ValueKey('test-accounts-panel'));
     final forgot = find.byKey(const ValueKey('forgot-password-link'));

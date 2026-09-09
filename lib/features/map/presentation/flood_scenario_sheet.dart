@@ -91,7 +91,7 @@ class FloodScenarioSheet extends ConsumerWidget {
                 ),
                 'empty' => const AppStateMessage(
                   icon: Icons.water_damage_outlined,
-                  title: 'Không có kịch bản ngập úng nào.',
+                  title: 'Chưa có kịch bản ngập nào',
                   liveRegion: true,
                 ),
                 _ => ListView.separated(
@@ -106,8 +106,10 @@ class FloodScenarioSheet extends ConsumerWidget {
                     final scenario = state.scenarios[index];
                     return _ScenarioCard(
                       scenario: scenario,
-                      isSelected: state.selectedScenarioCode == scenario.code,
-                      onTap: () => controller.toggleScenario(scenario),
+                      isSelected: state.selectedScenarioId == scenario.id,
+                      onTap: scenario.canSelect
+                          ? () => controller.toggleScenario(scenario)
+                          : null,
                     );
                   },
                 ),
@@ -129,7 +131,7 @@ class _ScenarioCard extends StatelessWidget {
 
   final FloodScenarioModel scenario;
   final bool isSelected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -189,7 +191,7 @@ class _ScenarioCard extends StatelessWidget {
                     ),
                     Switch.adaptive(
                       value: isSelected,
-                      onChanged: (_) => onTap(),
+                      onChanged: onTap == null ? null : (_) => onTap!(),
                       activeTrackColor: colorScheme.primary,
                     ),
                   ],
@@ -212,6 +214,32 @@ class _ScenarioCard extends StatelessWidget {
                         ),
                       ),
                     ],
+                  ),
+                ],
+                if (scenario.tideRangeText.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text('Mực triều: ${scenario.tideRangeText}'),
+                ],
+                if (scenario.hasCurrentConditions) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      scenario.currentConditionsText,
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+                if (scenario.layer == null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Chưa có lớp bản đồ',
+                    style: TextStyle(color: colorScheme.error),
                   ),
                 ],
                 if (scenario.description != null &&

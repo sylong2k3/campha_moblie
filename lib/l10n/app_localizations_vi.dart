@@ -15,6 +15,50 @@ class AppLocalizationsVi extends AppLocalizations {
   String get commonRetry => 'Thử lại';
 
   @override
+  String get notificationsTitle => 'Thông báo';
+
+  @override
+  String get notificationsAll => 'Tất cả';
+
+  @override
+  String get notificationsUnread => 'Chưa đọc';
+
+  @override
+  String get notificationsMarkAllRead => 'Đánh dấu tất cả đã đọc';
+
+  @override
+  String get notificationsLoadError =>
+      'Không thể tải thông báo. Vui lòng thử lại.';
+
+  @override
+  String get notificationsActionError =>
+      'Thao tác chưa thành công. Vui lòng thử lại.';
+
+  @override
+  String get notificationsEmpty => 'Chưa có thông báo nào';
+
+  @override
+  String get notificationsUnreadEmpty => 'Không có thông báo chưa đọc';
+
+  @override
+  String get notificationsLoadMore => 'Tải thêm';
+
+  @override
+  String get notificationsDelete => 'Xóa thông báo';
+
+  @override
+  String get notificationsDeleteConfirm =>
+      'Xóa thông báo này? Thao tác không thể hoàn tác.';
+
+  @override
+  String get notificationsJustNow => 'Vừa xong';
+
+  @override
+  String notificationsDaysAgo(int count) {
+    return '$count ngày trước';
+  }
+
+  @override
   String get commonCancel => 'Huỷ';
 
   @override

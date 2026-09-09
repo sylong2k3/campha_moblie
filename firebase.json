@@ -1,0 +1,11 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "web-gis-80f8b"
+        }
+      }
+    }
+  }
+}

@@ -5,10 +5,8 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
-    // TODO: bật lại khi có google-services.json/firbase.json thật cho dự án
-    // Cẩm Phả (xem PushService.initFirebase — app chạy an toàn khi chưa có):
-    // id("com.google.gms.google-services")
-    // id("com.google.firebase.crashlytics")
+    id("com.google.gms.google-services")
+    id("com.google.firebase.crashlytics")
 }
 
 val keystoreProperties = Properties()
@@ -19,6 +17,20 @@ if (keystorePropertiesFile.exists()) {
 val requiredSigningKeys = listOf("keyAlias", "keyPassword", "storeFile", "storePassword")
 val hasReleaseSigning =
     keystorePropertiesFile.exists() && requiredSigningKeys.all { !keystoreProperties.getProperty(it).isNullOrBlank() }
+val releaseStoreFile = keystoreProperties.getProperty("storeFile")
+    ?.takeIf { it.isNotBlank() }?.let { rootProject.file(it) }
+val verifyReleaseSigning = tasks.register("verifyReleaseSigning") {
+    doLast {
+        check(hasReleaseSigning && releaseStoreFile?.isFile == true) {
+            "Release signing required: provide keyAlias, keyPassword, storeFile and storePassword in android/key.properties with a valid keystore."
+        }
+    }
+}
+tasks.configureEach {
+    if (name.startsWith("pre") && name.endsWith("ReleaseBuild")) {
+        dependsOn(verifyReleaseSigning)
+    }
+}
 
 android {
     namespace = "vn.gov.campha.mobilegis"
@@ -73,11 +85,7 @@ android {
             create("release") {
                 keyAlias = keystoreProperties.getProperty("keyAlias")
                 keyPassword = keystoreProperties.getProperty("keyPassword")
-                val configuredStoreFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
-                require(configuredStoreFile.isFile) {
-                    "Không tìm thấy production keystore: ${configuredStoreFile.absolutePath}"
-                }
-                storeFile = configuredStoreFile
+                storeFile = releaseStoreFile
                 storePassword = keystoreProperties.getProperty("storePassword")
             }
         }
@@ -85,11 +93,7 @@ android {
 
     buildTypes {
         release {
-            signingConfig = if (hasReleaseSigning) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
-            }
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -106,4 +110,11 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    // Import the Firebase BoM (https://firebase.google.com/docs/crashlytics/android/get-started#add-sdk)
+    implementation(platform("com.google.firebase:firebase-bom:33.10.0"))
+
+    // Add dependencies for Crashlytics and Analytics
+    implementation("com.google.firebase:firebase-crashlytics")
+    implementation("com.google.firebase:firebase-analytics")
 }

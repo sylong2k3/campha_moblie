@@ -9,7 +9,10 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_motion.dart';
+import '../../../core/error/app_exception.dart';
+import '../../../core/error/error_l10n.dart';
 import '../../../core/l10n/l10n.dart';
+import '../../../core/location/location_helper.dart';
 import '../../../core/network/api_config.dart';
 import '../../../core/storage/token_storage.dart';
 import '../../auth/domain/session_controller.dart';
@@ -23,6 +26,13 @@ import '../../tools/presentation/measure_sheet.dart';
 import '../data/map_repository.dart';
 import '../domain/layer_model.dart';
 import '../domain/map_controller.dart';
+import '../domain/flood_scenario_controller.dart';
+import '../domain/flood_hydrology_controller.dart';
+import '../domain/forest_classification_controller.dart';
+import 'flood_hydrology_sheet.dart';
+import 'forest_classification_sheet.dart';
+import 'thematic_overlay_renderer.dart';
+import '../../notifications/presentation/widgets/notification_bell_button.dart';
 import 'basemap_selection_sheet.dart';
 import 'flood_scenario_sheet.dart';
 import 'layer_catalog_sheet.dart';
@@ -36,7 +46,7 @@ class MapHomeScreen extends ConsumerStatefulWidget {
 }
 
 class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   static const _basemapSourceId = 'catalog-basemap-source';
   static const _basemapLayerId = 'catalog-basemap-layer';
   static const _fieldSourceId = 'field-tools-source';
@@ -54,10 +64,12 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
   static String _rasterStyleLayerId(String layerId) => 'raster-style-$layerId';
 
   MapboxMap? _map;
+  ThematicOverlayRenderer? _thematicRenderer;
   bool _styleReady = false;
   bool _mapAuthReady = false;
   bool _loaded = false;
   bool _fieldOverlaySyncing = false;
+  bool _navigatingToFeature = false;
   FieldToolsState? _pendingFieldOverlay;
   String? _error;
   String? _selectedFeatureLabel;
@@ -65,15 +77,12 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
   String? _currentStyleUri;
   bool _isSyncingCatalog = false;
   bool _needsSyncCatalog = false;
+  bool _isSyncingMap = false;
+  bool _needsSyncMap = false;
   FieldToolMode _activeToolPanel = FieldToolMode.idle;
   bool _showLegendCard = true;
-  static final _camPhaCameraBounds = CameraBoundsOptions(
-    bounds: CoordinateBounds(
-      southwest: Point(coordinates: Position(106.78441, 20.06150)),
-      northeast: Point(coordinates: Position(107.85559, 22.07171)),
-      infiniteBounds: false,
-    ),
-    minZoom: 6.5,
+  static final _cameraBounds = CameraBoundsOptions(
+    minZoom: 0,
     maxZoom: 20.0,
   );
 
@@ -85,6 +94,12 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
   late final TokenStorage _tokenStorage;
   late final String _apiHost;
   StreamSubscription<geo.Position>? _routePositionSubscription;
+  StreamSubscription<geo.ServiceStatus>? _routeServiceSubscription;
+  Future<void> _routeTrackingCleanup = Future<void>.value();
+  int _routeTrackingRevision = 0;
+  bool _locatingUser = false;
+  bool _openedGpsSettings = false;
+  bool _gpsRecoveryVisible = false;
   Timer? _rasterTicketRefreshTimer;
 
   /// Vé tile-ticket cho layer raster private hết hạn sau ~15 phút
@@ -98,6 +113,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _tokenStorage = ref.read(tokenStorageProvider);
     _apiHost = ref.read(mapRepositoryProvider).apiHost;
     _tokenStorage.addTokenChangeListener(_applyMapAuth);
@@ -106,6 +122,12 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
       final nextId = next.user?.id;
       if (previousId != nextId || previous?.status != next.status) {
         ref.read(mapCatalogProvider.notifier).resetForIdentityChange();
+        ref.read(mapRepositoryProvider).clearTileTickets();
+        if (previous?.isBootstrapping == false) {
+          ref.read(floodScenarioProvider.notifier).resetForIdentityChange();
+          ref.read(floodHydrologyProvider.notifier).resetForIdentityChange();
+        }
+        _syncThematicOverlays();
       }
     });
     ref.listenManual<FieldToolsState>(fieldToolsProvider, (previous, next) {
@@ -124,8 +146,28 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _thematicRenderer?.setPaused(state != AppLifecycleState.resumed);
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      unawaited(_stopRoutePositionTracking());
+      return;
+    }
+    if (state != AppLifecycleState.resumed) return;
+    // Cài đặt trả về ngay khi mở, chỉ thử lại lúc người dùng quay về app.
+    if (_openedGpsSettings) {
+      _openedGpsSettings = false;
+      unawaited(_locateUserAndCenterMap());
+    } else if (_hasActiveRoute && !_locatingUser) {
+      unawaited(_startRoutePositionTracking());
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _rasterTicketRefreshTimer?.cancel();
+    _thematicRenderer?.dispose();
     unawaited(_stopRoutePositionTracking());
     _tokenStorage.removeTokenChangeListener(_applyMapAuth);
     _map?.removeInteraction(_fieldTapInteractionId);
@@ -148,51 +190,128 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     }
   }
 
-  Future<void> _startRoutePositionTracking() async {
-    await _stopRoutePositionTracking();
-    if (!await geo.Geolocator.isLocationServiceEnabled()) return;
-    final permission = await geo.Geolocator.checkPermission();
-    if (permission != geo.LocationPermission.always &&
-        permission != geo.LocationPermission.whileInUse) {
-      return;
-    }
-    _routePositionSubscription =
-        geo.Geolocator.getPositionStream(
-          locationSettings: const geo.LocationSettings(
-            accuracy: geo.LocationAccuracy.bestForNavigation,
-            distanceFilter: 5,
-          ),
-        ).listen((position) {
-          if (!mounted ||
-              position.isMocked ||
-              !position.accuracy.isFinite ||
-              position.accuracy > 50) {
-            return;
-          }
-          final controller = ref.read(fieldToolsProvider.notifier);
-          controller.updateRoutePosition(
-            position: GeoCoordinate(position.longitude, position.latitude),
-            accuracyMeters: position.accuracy,
-            timestamp: position.timestamp,
-          );
-          final state = ref.read(fieldToolsProvider);
-          final route = state.route;
-          if (route != null &&
-              route.steps.isNotEmpty &&
-              state.activeRouteStepIndex == route.steps.length - 1) {
-            unawaited(_stopRoutePositionTracking());
-          }
-        });
+  bool get _hasActiveRoute {
+    final state = ref.read(fieldToolsProvider);
+    final route = state.route;
+    return route != null &&
+        (route.steps.isEmpty ||
+            state.activeRouteStepIndex < route.steps.length - 1);
   }
 
-  Future<void> _stopRoutePositionTracking() async {
-    final subscription = _routePositionSubscription;
+  bool _isCurrentRouteTracking(int revision) =>
+      mounted &&
+      revision == _routeTrackingRevision &&
+      _hasActiveRoute &&
+      WidgetsBinding.instance.lifecycleState != AppLifecycleState.paused &&
+      WidgetsBinding.instance.lifecycleState != AppLifecycleState.detached;
+
+  Future<void> _startRoutePositionTracking() async {
+    final cleanup = _stopRoutePositionTracking();
+    final revision = _routeTrackingRevision;
+    await cleanup;
+    if (!_isCurrentRouteTracking(revision)) return;
+    final failure = await checkLocationAccess();
+    if (!_isCurrentRouteTracking(revision)) return;
+    if (failure != null) {
+      await _handleRouteTrackingError(failure, revision);
+      return;
+    }
+    try {
+      _routeServiceSubscription = geo.Geolocator.getServiceStatusStream().listen(
+        (status) {
+          if (status == geo.ServiceStatus.disabled) {
+            unawaited(
+              _handleRouteTrackingError(
+                LocationFailure.serviceDisabled,
+                revision,
+              ),
+            );
+          }
+        },
+        onError: (Object error) =>
+            unawaited(_handleRouteTrackingError(error, revision)),
+      );
+      _routePositionSubscription = geo.Geolocator.getPositionStream(
+        locationSettings: const geo.LocationSettings(
+          accuracy: geo.LocationAccuracy.bestForNavigation,
+          distanceFilter: 5,
+        ),
+      ).listen(
+        (position) {
+          if (!_isCurrentRouteTracking(revision) ||
+              !isRecentAccuratePosition(position)) {
+            return;
+          }
+          try {
+            ref.read(fieldToolsProvider.notifier).updateRoutePosition(
+              position: GeoCoordinate(position.longitude, position.latitude),
+              accuracyMeters: position.accuracy,
+              timestamp: position.timestamp,
+            );
+            if (!_hasActiveRoute) unawaited(_stopRoutePositionTracking());
+          } catch (error) {
+            unawaited(_handleRouteTrackingError(error, revision));
+          }
+        },
+        onError: (Object error) =>
+            unawaited(_handleRouteTrackingError(error, revision)),
+        onDone: () => unawaited(
+          _handleRouteTrackingError(LocationFailure.unavailable, revision),
+        ),
+      );
+    } catch (error) {
+      await _handleRouteTrackingError(error, revision);
+    }
+  }
+
+  Future<void> _handleRouteTrackingError(Object error, int revision) async {
+    if (!_isCurrentRouteTracking(revision)) return;
+    final cleanup = _stopRoutePositionTracking();
+    final stoppedRevision = _routeTrackingRevision;
+    await cleanup;
+    if (!_isCurrentRouteTracking(stoppedRevision)) return;
+    final failure = error is LocationFailure
+        ? error
+        : error is geo.LocationServiceDisabledException
+            ? LocationFailure.serviceDisabled
+            : await checkLocationAccess() ??
+                (error is geo.PermissionDeniedException
+                    ? LocationFailure.permissionDenied
+                    : LocationFailure.unavailable);
+    if (!_isCurrentRouteTracking(stoppedRevision)) return;
+    debugPrint('[LOCATE] route_tracking_stopped: $error');
+    unawaited(_showLocationFailure(failure));
+  }
+
+  Future<void> _stopRoutePositionTracking() {
+    // Vô hiệu callback trước await; lần khởi động sau phải đợi hủy native xong.
+    _routeTrackingRevision++;
+    final subscriptions = <StreamSubscription<dynamic>?>[
+      _routePositionSubscription,
+      _routeServiceSubscription,
+    ];
     _routePositionSubscription = null;
-    await subscription?.cancel();
+    _routeServiceSubscription = null;
+    return _routeTrackingCleanup = _routeTrackingCleanup.then((_) async {
+      for (final subscription in subscriptions) {
+        try {
+          await subscription?.cancel();
+        } catch (error) {
+          debugPrint('[LOCATE] cancel_tracking_failed: $error');
+        }
+      }
+    });
   }
 
   Future<void> _onMapCreated(MapboxMap map) async {
     _map = map;
+    _thematicRenderer?.dispose();
+    _thematicRenderer = ThematicOverlayRenderer(
+      map: map, repository: ref.read(mapRepositoryProvider),
+      isAuthenticated: () => mounted && ref.read(sessionControllerProvider).isAuthenticated,
+      onError: _onThematicError,
+    );
+    _syncThematicOverlays();
     _mapAuthReady = false;
     _currentStyleUri = ApiConfig.mapboxStyleStreet.isEmpty
         ? MapboxStyles.STANDARD
@@ -203,7 +322,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
         zoom: 9.6,
       ),
     );
-    await map.setBounds(_camPhaCameraBounds);
+    await map.setBounds(_cameraBounds);
     await _applyMapAuth();
     await map.compass.updateSettings(CompassSettings(enabled: false));
     await map.scaleBar.updateSettings(ScaleBarSettings(enabled: false));
@@ -228,7 +347,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     if (mounted) {
       setState(() => _error = null);
     }
-    await _map?.setBounds(_camPhaCameraBounds);
+    await _map?.setBounds(_cameraBounds);
     await _applyMapLanguage();
     await _applyMapAuth();
     if (!_mapAuthReady) return;
@@ -237,6 +356,8 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     _installFieldTapInteraction();
     await _syncMap(catalog);
     await _syncFieldOverlay(ref.read(fieldToolsProvider));
+    _syncThematicOverlays();
+    _thematicRenderer?.styleLoaded();
   }
 
   /// Đặt nhãn bản đồ nền Mapbox (tên đường, địa danh...) hiển thị tiếng Việt.
@@ -260,6 +381,8 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     if (basemap.isMapboxStyle) {
       if (_currentStyleUri != basemap.urlTemplate) {
         _currentStyleUri = basemap.urlTemplate;
+        _styleReady = false;
+        _thematicRenderer?.styleChanging();
         await map.loadStyleURI(basemap.urlTemplate);
         await _applyMapLanguage();
       }
@@ -323,7 +446,33 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     }
   }
 
+  /// `onStyleLoadedListener` và `onMapLoadedListener` đều kích hoạt sync lúc
+  /// khởi động; nếu hai lần chạy đan xen nhau thì cả hai cùng thấy
+  /// `styleLayerExists == false` và cùng gọi `_addLayer` cho một layer —
+  /// lần sau xoá mất source lần trước vừa thêm và ném lỗi render giả.
+  /// Chỉ cho một lượt sync chạy tại một thời điểm, lượt đến sau chạy lại
+  /// bằng state mới nhất sau khi lượt hiện tại kết thúc.
   Future<void> _syncMap(MapCatalogState state) async {
+    if (_isSyncingMap) {
+      _needsSyncMap = true;
+      return;
+    }
+    _isSyncingMap = true;
+    try {
+      await _syncMapOnce(state);
+      if (mounted) _syncThematicOverlays();
+    } finally {
+      _isSyncingMap = false;
+      if (_needsSyncMap) {
+        _needsSyncMap = false;
+        if (mounted) {
+          await _syncMap(ref.read(mapCatalogProvider));
+        }
+      }
+    }
+  }
+
+  Future<void> _syncMapOnce(MapCatalogState state) async {
     final map = _map;
     if (map == null || !_styleReady || !_mapAuthReady) return;
     var removedAny = false;
@@ -339,7 +488,21 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
         _renderedLayerIds.remove(layer.id);
       }
       if (shouldRender && !rendered) {
-        await _addLayer(map, layer, state.opacityOf(layer.id));
+        // Raster (lớp phủ) luôn nằm dưới vector (ranh giới, đường, điểm):
+        // tìm vector layer đầu tiên trong catalog đang được render → chèn dưới nó.
+        LayerPosition? position;
+        if (layer.isRaster) {
+          for (final existing in state.layers) {
+            if (!existing.isRaster && _renderedLayerIds.contains(existing.id)) {
+              position = LayerPosition(
+                below: _vectorStyleLayerId(existing.id),
+              );
+              break;
+            }
+          }
+        }
+        await _addLayer(map, layer, state.opacityOf(layer.id),
+            position: position);
         if (!layer.isRaster) {
           await Future.delayed(const Duration(milliseconds: 250));
         }
@@ -382,8 +545,9 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
   Future<void> _addLayer(
     MapboxMap map,
     LayerModel layer,
-    double opacity,
-  ) async {
+    double opacity, {
+    LayerPosition? position,
+  }) async {
     final renderError = context.l10n.mapLayerRenderError(layer.nameVi);
     try {
       if (layer.isRaster) {
@@ -392,6 +556,11 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
           throw const FormatException('Raster layer has no GeoServer layer');
         }
         final repository = ref.read(mapRepositoryProvider);
+        // Layer raster private cần vé tile-ticket lấy qua API yêu cầu JWT.
+        // Khách (guest) không có JWT → bỏ qua yên lặng, không báo lỗi.
+        final isAuthenticated =
+            ref.read(sessionControllerProvider).isAuthenticated;
+        if (!layer.isPublic && !isAuthenticated) return;
         final ticket = layer.isPublic
             ? null
             : await repository.validRasterTileTicket(layer.id);
@@ -414,13 +583,35 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
             volatile: true,
           ),
         );
-        await map.style.addLayer(
-          RasterLayer(
-            id: styleLayerId,
-            sourceId: sourceId,
-            rasterOpacity: opacity,
-          ),
-        );
+        if (position != null) {
+          try {
+            await map.style.addLayerAt(
+              RasterLayer(
+                id: styleLayerId,
+                sourceId: sourceId,
+                rasterOpacity: opacity,
+              ),
+              position,
+            );
+          } catch (_) {
+            // Fallback: layer "below" co the da bi xoa (basemap reload, etc.)
+            await map.style.addLayer(
+              RasterLayer(
+                id: styleLayerId,
+                sourceId: sourceId,
+                rasterOpacity: opacity,
+              ),
+            );
+          }
+        } else {
+          await map.style.addLayer(
+            RasterLayer(
+              id: styleLayerId,
+              sourceId: sourceId,
+              rasterOpacity: opacity,
+            ),
+          );
+        }
         await map.style.setStyleLayerProperty(
           styleLayerId,
           'raster-opacity',
@@ -520,8 +711,16 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
             // 4. Chỉ push route detail nếu layer được cấu hình chỉnh sửa (canEdit)
             final featureId =
                 feature.properties['feature_id'] ?? feature.id?.id;
-            if (layer.canEdit && featureId != null && mounted) {
-              context.push('/map/feature/${layer.id}/$featureId');
+            if (layer.canEdit &&
+                featureId != null &&
+                mounted &&
+                !_navigatingToFeature) {
+              _navigatingToFeature = true;
+              context
+                  .push('/map/feature/${layer.id}/$featureId')
+                  .whenComplete(() {
+                    if (mounted) _navigatingToFeature = false;
+                  });
             }
           }),
           interactionID: 'identify-${layer.id}',
@@ -926,6 +1125,61 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     );
   }
 
+  void _syncThematicOverlays() {
+    if (!mounted || _thematicRenderer == null) return;
+    final scenario = ref.read(floodScenarioProvider).selectedScenario;
+    final hydrology = ref.read(floodHydrologyProvider);
+    final forest = ref.read(forestClassificationProvider);
+    final layers = <ThematicRaster>[];
+    if (forest.isVisible && forest.snapshot != null) {
+      try {
+        final url = ref.read(mapRepositoryProvider).forestTileUrl(forest.snapshot!);
+        if (url != null) {
+          layers.add(ThematicRaster(sourceId: 'forest-classification',
+          name: 'Phân loại đối tượng', tileUrl: url, opacity: forest.opacity));
+        }
+      } catch (_) {
+        setState(() => _error = 'Nguồn bản đồ phân loại không hợp lệ');
+      }
+    }
+    if (scenario != null && scenario.canSelect) {
+      final layer = scenario.layer!;
+      layers.add(ThematicRaster(sourceId: 'flood-scenario-${scenario.id}',
+        name: scenario.nameVi, registryLayerId: layer.id, isPublic: layer.isPublic,
+        minZoom: layer.minZoom ?? 0, maxZoom: layer.maxZoom ?? 22));
+    }
+    for (final artifact in hydrology.currentArtifacts) {
+      if (hydrology.visibleIds.contains(artifact.id) && artifact.registryLayerId != null) {
+        layers.add(ThematicRaster(sourceId: 'flood-artifact-${artifact.id}',
+          name: artifact.labelVi, registryLayerId: artifact.registryLayerId, isPublic: artifact.isPublic));
+      }
+    }
+    final vector = ref.read(mapCatalogProvider).layers.where(
+      (l) => !l.isRaster && _renderedLayerIds.contains(l.id)).firstOrNull;
+    _thematicRenderer!.update(layers, belowLayerId: vector == null ? null : _vectorStyleLayerId(vector.id));
+  }
+
+  void _onThematicError(ThematicRaster layer, Object error) {
+    if (!mounted) return;
+    setState(() => _error = '${layer.name}: ${error.localizedErrorMessage(context.l10n)}');
+    if (error is UnauthorizedException || error is ForbiddenException || error is NotFoundException) {
+      if (layer.sourceId.startsWith('flood-scenario-')) {
+        ref.read(floodScenarioProvider.notifier).deactivate();
+      } else if (layer.sourceId.startsWith('flood-artifact-')) {
+        final id = int.tryParse(layer.sourceId.replaceFirst('flood-artifact-', ''));
+        if (id != null) ref.read(floodHydrologyProvider.notifier).hideArtifact(id);
+      }
+    }
+  }
+
+  Future<void> _openFloodHydrology() => showModalBottomSheet<void>(
+    context: context, isScrollControlled: true, useSafeArea: true,
+    builder: (_) => const FloodHydrologySheet());
+
+  Future<void> _openForestClassification() => showModalBottomSheet<void>(
+    context: context, isScrollControlled: true, useSafeArea: true,
+    builder: (_) => const ForestClassificationSheet());
+
   Future<void> _openCatalog() async {
     await showModalBottomSheet<void>(
       context: context,
@@ -1011,6 +1265,8 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
         'Kịch bản ngập úng',
         _openFloodScenarios,
       ),
+      _ToolItem(Icons.flood_outlined, 'Ngập lụt & Thủy văn', _openFloodHydrology),
+      _ToolItem(Icons.forest_outlined, 'Phân loại đối tượng', _openForestClassification),
       _ToolItem(
         Icons.location_searching_rounded,
         context.l10n.locationWeatherTitle,
@@ -1092,6 +1348,135 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
       ) ??
       Future.value();
 
+  Future<void> _locateUserAndCenterMap() async {
+    if (!mounted || _locatingUser) return;
+    _locatingUser = true;
+    try {
+      final result = await getCurrentLocation();
+      if (!mounted) return;
+      if (!result.isSuccess) {
+        // Không giữ khóa định vị trong lúc hộp thoại/Cài đặt đang mở.
+        unawaited(_showLocationFailure(result.failure!));
+        return;
+      }
+
+      final pos = result.position!;
+      final coord = GeoCoordinate(pos.longitude, pos.latitude);
+
+      ref.read(fieldToolsProvider.notifier).setGpsLocation(
+        coordinate: coord,
+        accuracyMeters: pos.accuracy,
+        timestamp: pos.timestamp,
+      );
+
+      try {
+        await _map?.location.updateSettings(
+          LocationComponentSettings(
+            enabled: true,
+            pulsingEnabled: true,
+          ),
+        );
+      } catch (_) {}
+
+      if (!mounted) return;
+      final animDuration = AppMotion.camera(context);
+      await _map?.flyTo(
+        CameraOptions(
+          center: Point(coordinates: Position(pos.longitude, pos.latitude)),
+          zoom: 15.5,
+        ),
+        MapAnimationOptions(duration: animDuration),
+      );
+
+      if (mounted && _hasActiveRoute && _routePositionSubscription == null) {
+        await _startRoutePositionTracking();
+      }
+    } catch (error) {
+      debugPrint('[LOCATE] center_map_failed: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.l10n.errorUnknown)),
+        );
+      }
+    } finally {
+      _locatingUser = false;
+    }
+  }
+
+  Future<void> _showLocationFailure(LocationFailure failure) async {
+    if (!mounted) return;
+    final l10n = context.l10n;
+    if (failure == LocationFailure.timeout ||
+        failure == LocationFailure.unavailable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.locationAccuracyUnavailable),
+          action: SnackBarAction(
+            label: l10n.commonRetry,
+            onPressed: () => unawaited(_locateUserAndCenterMap()),
+          ),
+        ),
+      );
+      return;
+    }
+    await _showGpsRecoveryDialog(
+      title: l10n.locationWeatherTitle,
+      message: switch (failure) {
+        LocationFailure.serviceDisabled => l10n.locationServiceOff,
+        LocationFailure.permissionDeniedForever => l10n.locationDeniedForever,
+        _ => l10n.locationDenied,
+      },
+      actionLabel: l10n.locationOpenSettings,
+      onAction: failure == LocationFailure.serviceDisabled
+          ? geo.Geolocator.openLocationSettings
+          : geo.Geolocator.openAppSettings,
+    );
+  }
+
+  Future<void> _showGpsRecoveryDialog({
+    required String title,
+    required String message,
+    required String actionLabel,
+    required Future<bool> Function() onAction,
+  }) async {
+    if (!mounted || _gpsRecoveryVisible) return;
+    _gpsRecoveryVisible = true;
+    try {
+      final open = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(title),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(dialogContext.l10n.commonCancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(actionLabel),
+            ),
+          ],
+        ),
+      );
+      if (open != true || !mounted) return;
+      _openedGpsSettings = true;
+      if (!await onAction()) {
+        throw StateError('Could not open location settings');
+      }
+    } catch (error) {
+      _openedGpsSettings = false;
+      debugPrint('[LOCATE] open_settings_failed: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.l10n.errorUnknown)),
+        );
+      }
+    } finally {
+      _gpsRecoveryVisible = false;
+    }
+  }
+
   void _queueFieldOverlay(FieldToolsState state) {
     _pendingFieldOverlay = state;
     if (_fieldOverlaySyncing) return;
@@ -1126,6 +1511,9 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     ref.listen<MapCatalogState>(mapCatalogProvider, (previous, next) {
       unawaited(_syncCatalog(previous, next));
     });
+    ref.listen(floodScenarioProvider, (_, _) => _syncThematicOverlays());
+    ref.listen(floodHydrologyProvider, (_, _) => _syncThematicOverlays());
+    ref.listen(forestClassificationProvider, (_, _) => _syncThematicOverlays());
     ref.listen<FieldToolsState>(fieldToolsProvider, (_, next) {
       _queueFieldOverlay(next);
     });
@@ -1161,16 +1549,99 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
           isPoint: layer.isPoint,
         ),
     ];
-    final hasMapLegend = hasFloodLandCover || vectorLegendItems.isNotEmpty;
+
+    // --- Thematic overlay legends ---
+    final floodScenarioState = ref.watch(floodScenarioProvider);
+    final hydrologyState = ref.watch(floodHydrologyProvider);
+    final forestState = ref.watch(forestClassificationProvider);
+
+    final thematicLegendItems = <LegendColorItem>[];
+    final thematicNames = <String>[];
+
+    // Kịch bản ngập úng
+    if (floodScenarioState.selectedScenario case final scenario?
+        when scenario.canSelect) {
+      thematicNames.add(scenario.nameVi);
+      thematicLegendItems.addAll(defaultFloodLandCoverLegendItems);
+    }
+
+    // Ngập lụt & Thủy văn
+    for (final artifact in hydrologyState.currentArtifacts) {
+      if (!hydrologyState.visibleIds.contains(artifact.id)) continue;
+      final legend = hydrologyState.legends
+          .where((l) => l.code == artifact.code && l.module == artifact.module)
+          .firstOrNull;
+      if (legend != null && legend.entries.isNotEmpty) {
+        thematicNames.add(artifact.labelVi);
+        for (final entry in legend.entries) {
+          final colorInt = int.tryParse(
+            'FF${entry.color.replaceAll('#', '')}',
+            radix: 16,
+          );
+          if (colorInt != null) {
+            thematicLegendItems.add(LegendColorItem(
+              label: entry.label,
+              color: Color(colorInt),
+              geometryType: LegendGeometryType.raster,
+            ));
+          }
+        }
+      } else {
+        thematicNames.add(artifact.labelVi);
+        thematicLegendItems.addAll(defaultFloodLandCoverLegendItems);
+      }
+    }
+
+    // Phân loại đối tượng
+    if (forestState.isVisible && forestState.snapshot != null) {
+      final snap = forestState.snapshot!;
+      thematicNames.add('Phân loại ${snap.periodText}');
+      for (final cls in snap.legend) {
+        final colorInt = int.tryParse(
+          'FF${cls.color.replaceAll('#', '')}',
+          radix: 16,
+        );
+        if (colorInt != null) {
+          thematicLegendItems.add(LegendColorItem(
+            label: cls.nameVi,
+            color: Color(colorInt),
+            geometryType: LegendGeometryType.raster,
+          ));
+        }
+      }
+      if (snap.legend.isEmpty) {
+        thematicLegendItems.addAll(defaultFloodLandCoverLegendItems);
+      }
+    }
+
+    final hasMapLegend = hasFloodLandCover ||
+        vectorLegendItems.isNotEmpty ||
+        thematicLegendItems.isNotEmpty;
     final mapLegendItems = [
       ...vectorLegendItems,
       ...floodLegendItems,
+      ...thematicLegendItems,
     ];
-    final mapLegendTitle = (activeLayers.length == 1)
-        ? activeLayers.first.nameVi
+    final allLegendNames = [
+      ...activeLayers.map((l) => l.nameVi),
+      ...thematicNames,
+    ];
+    final mapLegendTitle = allLegendNames.length == 1
+        ? allLegendNames.first
         : 'Chú giải lớp bản đồ';
     final mapLegendKey =
-        'map-legend-${activeLayers.map((l) => l.id).join('-')}';
+        'map-legend-${activeLayers.map((l) => l.id).join('-')}'
+        '-t${thematicNames.length}'
+        '-f${floodScenarioState.selectedScenarioId ?? 0}'
+        '-h${hydrologyState.visibleIds.length}'
+        '-c${forestState.isVisible ? (forestState.snapshot?.id ?? 0) : 0}';
+
+    // Tự bật chú giải khi có overlay thematic mới
+    if (thematicLegendItems.isNotEmpty && !_showLegendCard) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _showLegendCard = true);
+      });
+    }
 
     return Scaffold(
       body: Stack(
@@ -1193,8 +1664,25 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
               unawaited(_syncMap(ref.read(mapCatalogProvider)));
             },
             onMapLoadErrorListener: (event) {
+              if (_thematicRenderer?.handleMapError(event) == true) return;
               final message = event.message.toLowerCase();
               if (message.contains('cancel') || message.contains('supersed')) {
+                return;
+              }
+              // Style Mapbox nền thường phát SPRITE/GLYPHS/STYLE vô hại lúc
+              // khởi động (font/icon tải chậm) — không phải lớp GIS Cẩm Phả
+              // nên không được hiện banner "Một lớp bản đồ chưa tải được".
+              // TILE: lỗi tile đơn lẻ (network tạm, cancel, out-of-bounds) —
+              // rất thường gặp và tự phục hồi, không cần thông báo người dùng.
+              if (event.type != MapLoadErrorType.SOURCE) {
+                return;
+              }
+              // Chỉ báo lỗi cho source của lớp catalog (mvt-* / raster-*);
+              // source của basemap và của style nền bỏ qua.
+              final sourceId = event.sourceId;
+              if (sourceId == null ||
+                  !(sourceId.startsWith('mvt-') ||
+                      sourceId.startsWith('raster-'))) {
                 return;
               }
               if (mounted) setState(() => _error = event.message);
@@ -1286,6 +1774,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
                                     child: const Icon(Icons.layers_outlined),
                                   ),
                                 ),
+                                const NotificationBellButton(),
                                 const SizedBox(width: 4),
                               ],
                             ),
@@ -1343,9 +1832,10 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
                                   onTap: _recenter,
                                 ),
                                 _MapControl(
+                                  key: const ValueKey('map-locate-user'),
                                   icon: Icons.my_location_rounded,
                                   tooltip: context.l10n.mapGpsAction,
-                                  onTap: _openLocationWeather,
+                                  onTap: _locateUserAndCenterMap,
                                 ),
                               ],
                             ),
@@ -1438,11 +1928,23 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
                                     vertical: 6,
                                   ),
                                 ),
-                                onPressed: () {
-                                  context.push(
-                                    '/map/feature/${_selectedSearchResult!.layerId}/${_selectedSearchResult!.featureId}',
-                                  );
-                                },
+                                onPressed: _navigatingToFeature
+                                    ? null
+                                    : () {
+                                        _navigatingToFeature = true;
+                                        context
+                                            .push(
+                                              '/map/feature/${_selectedSearchResult!.layerId}/${_selectedSearchResult!.featureId}',
+                                            )
+                                            .whenComplete(() {
+                                              if (mounted) {
+                                                setState(
+                                                  () => _navigatingToFeature =
+                                                      false,
+                                                );
+                                              }
+                                            });
+                                      },
                                 child: const Text('Chi tiết'),
                               ),
                               IconButton(

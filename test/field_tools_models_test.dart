@@ -3,6 +3,29 @@ import 'package:campha_moblie/features/tools/domain/field_tools_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('global GPS validation is separate from CamPha coverage', () {
+    for (final coordinate in const [
+      GeoCoordinate(-180, -90),
+      GeoCoordinate(180, 90),
+      GeoCoordinate(0, 0),
+      GeoCoordinate(151.2093, -33.8688),
+    ]) {
+      expect(coordinate.isValid, isTrue);
+      expect(coordinate.isInCamPhaBounds, isFalse);
+    }
+    for (final coordinate in const [
+      GeoCoordinate(-180.1, 0),
+      GeoCoordinate(180.1, 0),
+      GeoCoordinate(0, -90.1),
+      GeoCoordinate(0, 90.1),
+      GeoCoordinate(double.nan, 0),
+      GeoCoordinate(0, double.infinity),
+    ]) {
+      expect(coordinate.isValid, isFalse);
+      expect(coordinate.isInCamPhaBounds, isFalse);
+    }
+  });
+
   test('validates Cam Pha coordinates and closes polygon ring', () {
     const a = GeoCoordinate(107.32, 21.00);
     const b = GeoCoordinate(107.33, 21.01);

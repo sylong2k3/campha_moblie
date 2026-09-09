@@ -1,111 +1,113 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/map_repository.dart';
 import 'flood_scenario_model.dart';
-import 'map_controller.dart';
 
 class FloodScenarioState {
   const FloodScenarioState({
     this.scenarios = const [],
-    this.selectedScenarioCode,
+    this.selectedScenarioId,
     this.loading = false,
     this.error,
   });
 
   final List<FloodScenarioModel> scenarios;
-  final String? selectedScenarioCode;
+  final int? selectedScenarioId;
   final bool loading;
   final Object? error;
 
   FloodScenarioModel? get selectedScenario {
     for (final s in scenarios) {
-      if (s.code == selectedScenarioCode) return s;
+      if (s.id == selectedScenarioId) return s;
     }
     return null;
   }
 
   FloodScenarioState copyWith({
     List<FloodScenarioModel>? scenarios,
-    String? selectedScenarioCode,
-    bool clearSelectedScenarioCode = false,
+    int? selectedScenarioId,
+    bool clearSelectedScenarioId = false,
     bool? loading,
     Object? error,
     bool clearError = false,
   }) => FloodScenarioState(
     scenarios: scenarios ?? this.scenarios,
-    selectedScenarioCode: clearSelectedScenarioCode
+    selectedScenarioId: clearSelectedScenarioId
         ? null
-        : selectedScenarioCode ?? this.selectedScenarioCode,
+        : selectedScenarioId ?? this.selectedScenarioId,
     loading: loading ?? this.loading,
     error: clearError ? null : error ?? this.error,
   );
 }
 
 class FloodScenarioController extends Notifier<FloodScenarioState> {
+  int _generation = 0;
+  bool _disposed = false;
+  bool _autoActivated = false;
+
   @override
   FloodScenarioState build() {
+    ref.onDispose(() {
+      _disposed = true;
+      _generation++;
+    });
     Future.microtask(load);
     return const FloodScenarioState(loading: true);
   }
 
   Future<void> load() async {
+    if (_disposed) return;
+    final generation = ++_generation;
     state = state.copyWith(loading: true, clearError: true);
     try {
       final repository = ref.read(mapRepositoryProvider);
       // Chỉ tải các kịch bản ngập đang kích hoạt (activeOnly: true)
       final list = await repository.getFloodScenarios(activeOnly: true);
-      state = state.copyWith(scenarios: list, loading: false, clearError: true);
+      debugPrint('[FLOOD] scenarios loaded: ${list.length}, canSelect: ${list.where((s) => s.canSelect).length}');
+      if (_disposed || generation != _generation) return;
+      int? selected = state.selectedScenarioId;
+      if (!list.any((s) => s.id == selected && s.canSelect)) selected = null;
+      if (!_autoActivated) {
+        _autoActivated = true;
+        final candidates = list.where((s) => s.canSelect).toList()
+          ..sort((a, b) => (b.minRainfall ?? 0).compareTo(a.minRainfall ?? 0));
+        selected = candidates.firstOrNull?.id;
+      }
+      state = state.copyWith(
+        scenarios: list,
+        loading: false,
+        clearError: true,
+        selectedScenarioId: selected,
+        clearSelectedScenarioId: selected == null,
+      );
     } catch (err) {
-      state = state.copyWith(loading: false, error: err);
+      if (!_disposed && generation == _generation) {
+        state = state.copyWith(loading: false, error: err);
+      }
     }
   }
 
   void toggleScenario(FloodScenarioModel scenario) {
-    final catalogNotifier = ref.read(mapCatalogProvider.notifier);
-    final catalogState = ref.read(mapCatalogProvider);
+    if (!scenario.canSelect) return;
+    _autoActivated = true;
+    // Bấm lại kịch bản đang chọn để tắt; không thay đổi lớp dữ liệu thường.
+    state = state.copyWith(
+      selectedScenarioId: scenario.id,
+      clearSelectedScenarioId: state.selectedScenarioId == scenario.id,
+    );
+  }
 
-    // Tìm layer trùng code với scenario.layerCode hoặc scenario.layer?.code
-    final targetCode = scenario.layerCode.isNotEmpty
-        ? scenario.layerCode
-        : (scenario.layer?.code ?? '');
+  void deactivate() {
+    _autoActivated = true;
+    state = state.copyWith(clearSelectedScenarioId: true);
+  }
 
-    String? targetLayerId = scenario.layer?.id;
-    if (targetLayerId == null || targetLayerId.isEmpty) {
-      for (final layer in catalogState.layers) {
-        if (layer.code == targetCode) {
-          targetLayerId = layer.id;
-          break;
-        }
-      }
-    }
-
-    if (state.selectedScenarioCode == scenario.code) {
-      // Tắt kịch bản đang chọn
-      if (targetLayerId != null && targetLayerId.isNotEmpty) {
-        catalogNotifier.setLayerVisible(targetLayerId, false);
-      }
-      state = state.copyWith(clearSelectedScenarioCode: true);
-    } else {
-      // Tắt kịch bản cũ nếu có
-      if (state.selectedScenario != null) {
-        final currentSelected = state.selectedScenario!;
-        final oldCode = currentSelected.layerCode.isNotEmpty
-            ? currentSelected.layerCode
-            : (currentSelected.layer?.code ?? '');
-        for (final layer in catalogState.layers) {
-          if (layer.code == oldCode || layer.id == currentSelected.layer?.id) {
-            catalogNotifier.setLayerVisible(layer.id, false);
-          }
-        }
-      }
-
-      // Bật kịch bản mới
-      if (targetLayerId != null && targetLayerId.isNotEmpty) {
-        catalogNotifier.setLayerVisible(targetLayerId, true);
-      }
-
-      state = state.copyWith(selectedScenarioCode: scenario.code);
-    }
+  void resetForIdentityChange() {
+    _generation++;
+    _autoActivated = true;
+    state = const FloodScenarioState();
+    Future.microtask(load);
   }
 }
 

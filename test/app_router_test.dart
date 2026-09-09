@@ -1,4 +1,10 @@
 import 'package:campha_moblie/app/router/app_router.dart';
+import 'package:campha_moblie/app/router/route_names.dart';
+import 'package:campha_moblie/features/auth/domain/session_controller.dart';
+import 'package:campha_moblie/features/auth/domain/user_model.dart';
+import 'package:campha_moblie/l10n/app_localizations.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -62,4 +68,47 @@ void main() {
     expect(sanitizeReturnTo('/unknown'), isNull);
     expect(sanitizeReturnTo(null), isNull);
   });
+
+  testWidgets('push to report detail from notifications', (tester) async {
+    final container = ProviderContainer(
+      overrides: [
+        sessionControllerProvider.overrideWith(_Session.new),
+      ],
+    );
+    addTearDown(container.dispose);
+    final router = container.read(appRouterProvider);
+    router.go(RoutePaths.map);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp.router(
+          routerConfig: router,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(router.state.uri.path, RoutePaths.map);
+    router.push(RoutePaths.notifications);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(router.state.uri.path, RoutePaths.notifications);
+    router.push(RoutePaths.reportDetail('28'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(router.state.uri.path, '/reports/28');
+  });
+}
+
+class _Session extends SessionController {
+  @override
+  SessionState build() => SessionState.authenticated(
+        UserModel.fromJson({
+          'id': '1',
+          'email': 'admin@campha.gov.vn',
+          'role': {'code': 'system_admin'},
+        }),
+      );
 }

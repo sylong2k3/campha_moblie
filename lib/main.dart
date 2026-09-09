@@ -1,8 +1,7 @@
 import 'dart:async';
 
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
+import 'core/error/crashlytics_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -43,15 +42,15 @@ Future<void> main() async {
         yield LicenseEntryWithLineBreaks(['Be Vietnam Pro'], license);
       });
 
-      // Vẽ UI trước; Firebase/push là optional và tự no-op khi flavor chưa có
-      // native config. Không giữ first frame để chờ platform initialization.
-      unawaited(PushService.initFirebase());
+      try {
+        await PushService.initFirebase();
+      } catch (e) {
+        if (kDebugMode) debugPrint('[PUSH] Firebase init error: $e');
+      }
       if (ApiConfig.mapboxToken.isNotEmpty) {
         MapboxOptions.setAccessToken(ApiConfig.mapboxToken);
       }
-      // Nhãn của basemap Mapbox (địa danh, quốc gia, khu vực) dùng tiếng Việt.
-      // Thiết lập này phải chạy trước khi bất kỳ MapWidget nào được khởi tạo.
-      MapboxMapsOptions.setLanguage('vi');
+
       if (kReleaseMode || kProfileMode) {
         final configError = ApiConfig.validateForRelease();
         if (configError != null) throw StateError(configError);
@@ -59,17 +58,15 @@ Future<void> main() async {
 
       runApp(const ProviderScope(child: MainApp()));
     },
-    (_, stack) {
-      // Firebase.apps rỗng nếu initFirebase() ở trên đã nuốt lỗi (chưa cấu
-      // hình) — lúc đó gọi Crashlytics sẽ tự ném lỗi khác, nên phải guard.
-      if (Firebase.apps.isNotEmpty) {
-        FirebaseCrashlytics.instance.recordError(
-          StateError('zone_uncaught_error'),
-          stack,
-          fatal: true,
-        );
-      } else if (kDebugMode) {
-        debugPrint('[CRASH] uncaught_error');
+    (error, stack) {
+      CrashlyticsService.recordError(
+        error,
+        stack,
+        reason: 'zone_uncaught_error',
+        fatal: true,
+      );
+      if (kDebugMode) {
+        debugPrint('[CRASH] uncaught_error: $error\n$stack');
       }
     },
   );

@@ -11,6 +11,7 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import '../../../app/router/route_names.dart';
 import '../../../core/error/error_l10n.dart';
 import '../../../core/l10n/l10n.dart';
+import '../../../core/location/location_helper.dart';
 import '../../auth/domain/session_controller.dart';
 import '../../shared/presentation/app_feedback.dart';
 import '../../tools/domain/field_tools_models.dart';
@@ -91,48 +92,41 @@ class _FieldReportsScreenState extends ConsumerState<FieldReportsScreen>
   Future<void> _applyNearby(_NearbySelection selection) async {
     setState(() => _nearbyPending = true);
     try {
-      if (!await geo.Geolocator.isLocationServiceEnabled()) {
-        if (mounted) {
-          await _showLocationRecovery(
-            context.l10n.locationServiceOff,
-            geo.Geolocator.openLocationSettings,
-            selection,
-          );
-        }
-        return;
-      }
-      var permission = await geo.Geolocator.checkPermission();
-      if (permission == geo.LocationPermission.denied) {
-        if (!mounted || !await _confirmLocationPrimer()) return;
-        permission = await geo.Geolocator.requestPermission();
-      }
-      if (permission == geo.LocationPermission.deniedForever) {
-        if (mounted) {
-          await _showLocationRecovery(
-            context.l10n.locationDeniedForever,
-            geo.Geolocator.openAppSettings,
-            selection,
-          );
-        }
-        return;
-      }
-      if (permission == geo.LocationPermission.denied) {
-        if (mounted) {
-          await _showLocationRecovery(
-            context.l10n.locationDenied,
-            geo.Geolocator.openAppSettings,
-            selection,
-          );
-        }
-        return;
-      }
-      final position = await geo.Geolocator.getCurrentPosition(
-        locationSettings: const geo.LocationSettings(
-          accuracy: geo.LocationAccuracy.high,
-          timeLimit: Duration(seconds: 15),
-        ),
-      );
+      final result = await getCurrentLocation();
       if (!mounted) return;
+      if (!result.isSuccess) {
+        switch (result.failure!) {
+          case LocationFailure.serviceDisabled:
+            await _showLocationRecovery(
+              context.l10n.locationServiceOff,
+              geo.Geolocator.openLocationSettings,
+              selection,
+            );
+          case LocationFailure.permissionDeniedForever:
+            await _showLocationRecovery(
+              context.l10n.locationDeniedForever,
+              geo.Geolocator.openAppSettings,
+              selection,
+            );
+          case LocationFailure.permissionDenied:
+            await _showLocationRecovery(
+              context.l10n.locationDenied,
+              geo.Geolocator.openAppSettings,
+              selection,
+            );
+          case LocationFailure.timeout:
+          case LocationFailure.unavailable:
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(context.l10n.locationAccuracyUnavailable),
+                ),
+              );
+            }
+        }
+        return;
+      }
+      final position = result.position!;
       await ref
           .read(fieldReportsProvider.notifier)
           .setNearby(
@@ -152,25 +146,6 @@ class _FieldReportsScreenState extends ConsumerState<FieldReportsScreen>
     }
   }
 
-  Future<bool> _confirmLocationPrimer() async =>
-      await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: Text(dialogContext.l10n.locationWeatherTitle),
-          content: Text(dialogContext.l10n.locationPrimer),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: Text(dialogContext.l10n.commonCancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: Text(dialogContext.l10n.commonContinue),
-            ),
-          ],
-        ),
-      ) ??
-      false;
 
   Future<void> _showLocationRecovery(
     String message,

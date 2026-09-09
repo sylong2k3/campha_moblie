@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/locale/locale_controller.dart';
 import '../../../app/theme/theme_controller.dart';
+import '../../../core/error/crashlytics_service.dart';
 import '../../../core/l10n/l10n.dart';
 import '../../../core/network/api_config.dart';
 import '../../../core/permissions/user_role.dart';
@@ -40,8 +42,23 @@ class ProfileScreen extends ConsumerWidget {
                       _SectionLabel(l10n.profileAccount),
                       const SizedBox(height: 8),
                       Card(
-                        child: ListTile(
-                          key: const ValueKey('profile-my-reports'),
+                        child: Column(
+                          children: [
+                            ListTile(
+                              key: const ValueKey('profile-notifications'),
+                              leading: const _ProfileTileIcon(
+                                icon: Icons.notifications_outlined,
+                              ),
+                              title: const Text('Thông báo'),
+                              trailing: const Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                size: 16,
+                              ),
+                              onTap: () => context.push('/notifications'),
+                            ),
+                            const Divider(height: 1, indent: 56),
+                            ListTile(
+                              key: const ValueKey('profile-my-reports'),
                           leading: const _ProfileTileIcon(
                             icon: Icons.assignment_outlined,
                           ),
@@ -51,6 +68,8 @@ class ProfileScreen extends ConsumerWidget {
                             size: 16,
                           ),
                           onTap: () => context.push('/reports/mine'),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -93,6 +112,21 @@ class ProfileScreen extends ConsumerWidget {
                               onTap: () => _confirmLogout(context, ref),
                             ),
                           ],
+                        ),
+                      ),
+                    ],
+                    if (kDebugMode) ...[
+                      const SizedBox(height: 12),
+                      Card(
+                        color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.25),
+                        child: ListTile(
+                          leading: Icon(
+                            Icons.bug_report_outlined,
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                          title: const Text('Test Firebase Crashlytics'),
+                          subtitle: const Text('Tạo crash thử nghiệm để kích hoạt dashboard trên Firebase Console'),
+                          onTap: () => CrashlyticsService.testCrash(),
                         ),
                       ),
                     ],

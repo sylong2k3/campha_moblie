@@ -66,15 +66,27 @@ class _LocationWeatherSheetState extends ConsumerState<LocationWeatherSheet>
     final colors = theme.colorScheme;
 
     final locationState = switch (state.locationStatus) {
-      LocationStatus.idle => FilledButton.icon(
-        key: const ValueKey('location-start'),
-        onPressed: controller.locate,
-        icon: const Icon(Icons.gps_fixed),
-        label: Text(l10n.locationStart),
+      LocationStatus.idle => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          FilledButton.icon(
+            key: const ValueKey('location-start'),
+            onPressed: controller.locate,
+            icon: const Icon(Icons.gps_fixed),
+            label: Text(l10n.locationStart),
+          ),
+          if (state.error != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              state.error!.localizedErrorMessage(l10n),
+              style: theme.textTheme.bodySmall?.copyWith(color: colors.error),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ],
       ),
       LocationStatus.locating => _LocationLoading(label: l10n.locationLocating),
-      LocationStatus.ready ||
-      LocationStatus.outsideBounds => _LocationCard(state: state),
+      LocationStatus.ready => _LocationCard(state: state),
       _ => _PermissionState(
         status: state.locationStatus,
         onRetry: controller.locate,
@@ -153,7 +165,8 @@ class _LocationWeatherSheetState extends ConsumerState<LocationWeatherSheet>
                     )
                   : const SizedBox.shrink(),
             ),
-            if (state.locationStatus == LocationStatus.ready) ...[
+            if (state.locationStatus == LocationStatus.ready &&
+                state.location?.isValid == true) ...[
               const SizedBox(height: 14),
               if (state.weather == null)
                 FilledButton.tonalIcon(
@@ -562,7 +575,6 @@ class _LocationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final coordinate = state.location!;
-    final outside = state.locationStatus == LocationStatus.outsideBounds;
     final accuracy = state.accuracyMeters;
     final lowAccuracy =
         accuracy != null && accuracy > ApiConfig.gpsAccuracyThresholdM;
@@ -572,7 +584,7 @@ class _LocationCard extends StatelessWidget {
         ? context.l10n.locationAccuracyLow(accuracy.toStringAsFixed(1))
         : context.l10n.locationAccuracy(accuracy.toStringAsFixed(1));
     final colors = Theme.of(context).colorScheme;
-    final statusColor = outside || lowAccuracy
+    final statusColor = lowAccuracy
         ? colors.error
         : accuracy == null
         ? colors.onSurfaceVariant
@@ -580,13 +592,9 @@ class _LocationCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: outside ? colors.errorContainer : colors.surfaceContainer,
+        color: colors.surfaceContainer,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: outside
-              ? colors.error.withValues(alpha: 0.35)
-              : colors.outlineVariant,
-        ),
+        border: Border.all(color: colors.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -597,10 +605,6 @@ class _LocationCard extends StatelessWidget {
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
-          if (outside) ...[
-            const SizedBox(height: 6),
-            Text(context.l10n.locationOutsideBounds),
-          ],
           const SizedBox(height: 6),
           Row(
             children: [

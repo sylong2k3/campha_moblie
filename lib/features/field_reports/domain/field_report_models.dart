@@ -112,7 +112,9 @@ class FieldReport {
           : GeoJsonGeometry.fromJson(
               _map(json['measured_geometry'], 'measured_geometry'),
             ),
-      photoCount: _integer(json['photo_count'], 'photo_count'),
+      photoCount: json['photo_count'] == null
+          ? (photos as List?)?.length ?? 0
+          : _integer(json['photo_count'], 'photo_count'),
       createdAt: _date(json['created_at'], 'created_at'),
       updatedAt: _date(json['updated_at'], 'updated_at'),
       senderUserId: json['sender_user_id']?.toString(),

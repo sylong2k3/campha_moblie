@@ -38,7 +38,7 @@ void main() {
       expect(scenario.isActive, false);
       expect(scenario.minRainfall, 0.0);
       expect(scenario.maxRainfall, 49.99);
-      expect(scenario.rainfallRangeText, '0 - 50 mm');
+      expect(scenario.rainfallRangeText, '0 – 49.99 mm');
       expect(scenario.layer?.id, '8');
       expect(scenario.layer?.code, 'lop_phu_sau_ngap_2015');
       expect(scenario.layer?.isRaster, true);

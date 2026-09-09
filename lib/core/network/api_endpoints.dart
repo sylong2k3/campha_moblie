@@ -45,6 +45,14 @@ class ApiEndpoints {
       '/web-map/layers/$layerId/legend';
   static const webMapBasemaps = '/web-map/basemaps';
   static const floodScenarios = '/flood/scenarios';
+  static const floodOverview = '/flood/overview';
+  static const floodRuns = '/flood/runs';
+  static const floodLayers = '/flood/layers';
+  static const floodLegends = '/flood/legends';
+  static const forestLatest = '/forest-classification/latest';
+  static const forestHistory = '/forest-classification/published-history';
+  static String forestSnapshot(int id) => '/forest-classification/snapshot/$id';
+  static String mapLayerWms(String layerId) => '/maps/layers/$layerId/wms';
   static String mapLayerTileTicket(String layerId) =>
       '/maps/layers/$layerId/tile-ticket';
   static String mobileTile(String layerId, int z, int x, int y) =>
@@ -96,4 +104,11 @@ class ApiEndpoints {
   static String cmsPdfMapDetail(String id) => '/cms/pdf-maps/$id';
   static String cmsPdfMapDownload(String id) =>
       '/cms/pdf-maps/$id/download-url';
+
+  // ── Thông báo (server-campha src/routes/notification.routes.js) ────────────
+  static const notificationsMine = '/notifications/mine';
+  static const notificationsUnreadCount = '/notifications/unread-count';
+  static const notificationsReadAll = '/notifications/read-all';
+  static String notificationRead(dynamic id) => '/notifications/$id/read';
+  static String notificationDelete(dynamic id) => '/notifications/$id';
 }

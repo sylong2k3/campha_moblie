@@ -40,4 +40,13 @@
 -keep class io.flutter.plugins.** { *; }
 -dontwarn com.google.android.play.core.**
 
+# Firebase Crashlytics ProGuard Rules
+-keepattributes SourceFile,LineNumberTable
+-keep public class * extends java.lang.Exception
+
+# Google Play Services Location & Geolocator
+-keep class com.google.android.gms.location.** { *; }
+-dontwarn com.google.android.gms.location.**
+-keep class com.baseflow.geolocator.** { *; }
+-dontwarn com.baseflow.geolocator.**
 

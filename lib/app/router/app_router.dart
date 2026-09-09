@@ -1,3 +1,4 @@
+import '../../features/notifications/presentation/notifications_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -29,7 +30,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   final notifier = _RouterRefreshNotifier(ref);
   ref.onDispose(notifier.dispose);
 
-  return GoRouter(
+  final router = GoRouter(
     initialLocation: RoutePaths.splash,
     refreshListenable: notifier,
     redirect: (context, state) {
@@ -39,9 +40,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final isAuthRoute = path.startsWith('/auth/');
 
       if (session.isBootstrapping) {
-        return isSplash ? null : RoutePaths.splash;
+        if (isSplash) return null;
+        final target = sanitizeReturnTo(state.uri.toString());
+        return Uri(
+          path: RoutePaths.splash,
+          queryParameters: target == null ? null : {'returnTo': target},
+        ).toString();
       }
-      if (isSplash) return RoutePaths.map;
+      if (isSplash) {
+        return sanitizeReturnTo(state.uri.queryParameters['returnTo']) ??
+            RoutePaths.map;
+      }
 
       if (session.isAuthenticated && isAuthRoute) {
         final returnTo = sanitizeReturnTo(
@@ -62,14 +71,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final protectedReport =
           path == RoutePaths.reportCreate ||
           path == RoutePaths.reportMine ||
-          RegExp(r'^/reports/\d+$').hasMatch(path);
+          RegExp(r'^/reports/\d+$').hasMatch(path) ||
+          RegExp(r'^/notifications/report/\d+$').hasMatch(path);
+      final protectedNotifications = path == RoutePaths.notifications;
       final protectedFeatureEdit =
           path == RoutePaths.mapFeatureSync ||
           RegExp(
             r'^/map/feature/\d+/[A-Za-z0-9_-]{1,120}/(edit|history)$',
           ).hasMatch(path);
       if (!session.isAuthenticated &&
-          (protectedReport || protectedFeatureEdit)) {
+          (protectedReport || protectedFeatureEdit || protectedNotifications)) {
         return '${RoutePaths.login}?returnTo=${Uri.encodeQueryComponent(state.uri.toString())}';
       }
       if (protectedFeatureEdit &&
@@ -80,6 +91,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      GoRoute(
+        path: RoutePaths.notifications,
+        name: RouteNames.notifications,
+        builder: (context, state) => const NotificationsScreen(),
+        routes: [
+          // Detail báo cáo mở từ Thông báo: đặt ngoài StatefulShellRoute để
+          // push không phải dựng lại page shell (gây trùng key Navigator) và
+          // để nút back quay về đúng màn Thông báo thay vì tab /reports.
+          GoRoute(
+            path: 'report/:id',
+            name: RouteNames.notificationReportDetail,
+            builder: (context, state) =>
+                FieldReportDetailScreen(reportId: state.pathParameters['id']!),
+          ),
+        ],
+      ),
       GoRoute(
         path: RoutePaths.splash,
         name: RouteNames.splash,
@@ -247,6 +274,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
     ],
   );
+  ref.onDispose(router.dispose);
+  return router;
 });
 
 const _allowedReturnPaths = {
@@ -260,6 +289,7 @@ const _allowedReturnPaths = {
   RoutePaths.documents,
   RoutePaths.profile,
   RoutePaths.changePassword,
+  RoutePaths.notifications,
 };
 
 String? sanitizeReturnTo(String? raw) {
@@ -278,7 +308,9 @@ String? sanitizeReturnTo(String? raw) {
   final mapFeature = RegExp(
     r'^/map/feature/\d+/[A-Za-z0-9_-]{1,120}(/(edit|history))?$',
   ).hasMatch(uri.path);
-  final reportDetail = RegExp(r'^/reports/\d+$').hasMatch(uri.path);
+  final reportDetail =
+      RegExp(r'^/reports/\d+$').hasMatch(uri.path) ||
+      RegExp(r'^/notifications/report/\d+$').hasMatch(uri.path);
   if (!_allowedReturnPaths.contains(uri.path) &&
       !cmsDetail &&
       !mapFeature &&
@@ -288,7 +320,7 @@ String? sanitizeReturnTo(String? raw) {
   return uri.toString();
 }
 
-/// Destination an toàn khi người dùng từ chối đăng nhập và tiếp tục như khách.
+/// Destination an toÃ n khi ngÆ°á»i dÃ¹ng tá»« chá»‘i Ä‘Äƒng nháº­p vÃ  tiáº¿p tá»¥c nhÆ° khÃ¡ch.
 String guestReturnTo(String? raw) {
   final sanitized = sanitizeReturnTo(raw);
   if (sanitized == null) return RoutePaths.map;
@@ -298,12 +330,18 @@ String guestReturnTo(String? raw) {
       RegExp(r'^/reports/\d+$').hasMatch(uri.path)) {
     return RoutePaths.reports;
   }
+  if (RegExp(r'^/notifications/report/\d+$').hasMatch(uri.path)) {
+    return RoutePaths.profile;
+  }
   if (uri.path == RoutePaths.mapFeatureSync) return RoutePaths.map;
   final protectedFeature = RegExp(
     r'^(/map/feature/\d+/[A-Za-z0-9_-]{1,120})/(edit|history)$',
   ).firstMatch(uri.path);
   if (protectedFeature != null) return protectedFeature.group(1)!;
-  if (uri.path == RoutePaths.changePassword) return RoutePaths.profile;
+  if (uri.path == RoutePaths.changePassword ||
+      uri.path == RoutePaths.notifications) {
+    return RoutePaths.profile;
+  }
   return sanitized;
 }
 

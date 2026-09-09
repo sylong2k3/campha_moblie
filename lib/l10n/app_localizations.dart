@@ -110,6 +110,84 @@ abstract class AppLocalizations {
   /// **'Thử lại'**
   String get commonRetry;
 
+  /// No description provided for @notificationsTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thông báo'**
+  String get notificationsTitle;
+
+  /// No description provided for @notificationsAll.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tất cả'**
+  String get notificationsAll;
+
+  /// No description provided for @notificationsUnread.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chưa đọc'**
+  String get notificationsUnread;
+
+  /// No description provided for @notificationsMarkAllRead.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đánh dấu tất cả đã đọc'**
+  String get notificationsMarkAllRead;
+
+  /// No description provided for @notificationsLoadError.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không thể tải thông báo. Vui lòng thử lại.'**
+  String get notificationsLoadError;
+
+  /// No description provided for @notificationsActionError.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thao tác chưa thành công. Vui lòng thử lại.'**
+  String get notificationsActionError;
+
+  /// No description provided for @notificationsEmpty.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chưa có thông báo nào'**
+  String get notificationsEmpty;
+
+  /// No description provided for @notificationsUnreadEmpty.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không có thông báo chưa đọc'**
+  String get notificationsUnreadEmpty;
+
+  /// No description provided for @notificationsLoadMore.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tải thêm'**
+  String get notificationsLoadMore;
+
+  /// No description provided for @notificationsDelete.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xóa thông báo'**
+  String get notificationsDelete;
+
+  /// No description provided for @notificationsDeleteConfirm.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xóa thông báo này? Thao tác không thể hoàn tác.'**
+  String get notificationsDeleteConfirm;
+
+  /// No description provided for @notificationsJustNow.
+  ///
+  /// In vi, this message translates to:
+  /// **'Vừa xong'**
+  String get notificationsJustNow;
+
+  /// No description provided for @notificationsDaysAgo.
+  ///
+  /// In vi, this message translates to:
+  /// **'{count} ngày trước'**
+  String notificationsDaysAgo(int count);
+
   /// No description provided for @commonCancel.
   ///
   /// In vi, this message translates to:

@@ -6,9 +6,16 @@ class GeoCoordinate {
   final double longitude;
   final double latitude;
 
-  bool get isInCamPhaBounds =>
+  bool get isValid =>
       longitude.isFinite &&
       latitude.isFinite &&
+      longitude >= -180 &&
+      longitude <= 180 &&
+      latitude >= -90 &&
+      latitude <= 90;
+
+  bool get isInCamPhaBounds =>
+      isValid &&
       longitude >= 107 &&
       longitude <= 108 &&
       latitude >= 20.7 &&

@@ -10,6 +10,8 @@ import '../../../core/network/api_endpoints.dart';
 import '../../../core/network/dio_client.dart';
 import '../domain/feature_detail_model.dart';
 import '../domain/flood_scenario_model.dart';
+import '../domain/flood_hydrology_model.dart';
+import '../domain/forest_classification_model.dart';
 import '../domain/layer_model.dart';
 
 final mapRepositoryProvider = Provider<MapRepository>(
@@ -21,6 +23,81 @@ class MapRepository {
 
   final Dio dio;
   final Map<String, MapTileTicket> _tileTicketCache = {};
+  final Map<String, Future<String>> _pendingTickets = {};
+  int _ticketGeneration = 0;
+
+  void clearTileTickets() {
+    _ticketGeneration++;
+    _tileTicketCache.clear();
+    _pendingTickets.clear();
+  }
+
+  void invalidateTileTicket(String layerId) =>
+      _tileTicketCache.remove('$layerId|view');
+
+  String floodWmsUrl(String registryLayerId, {String? ticket}) {
+    final id = int.tryParse(registryLayerId);
+    if (id == null || id <= 0) {
+      throw const FormatException('Invalid registry layer ID');
+    }
+    final base = ApiConfig.baseUrl.replaceAll(RegExp(r'/+$'), '');
+    return _tileTemplate(
+      Uri.parse('$base${ApiEndpoints.mapLayerWms(registryLayerId)}').replace(
+        queryParameters: {
+          'request': 'GetMap',
+          'version': '1.3.0',
+          'bbox': '{bbox-epsg-3857}',
+          'width': '256',
+          'height': '256',
+          'crs': 'EPSG:3857',
+          'format': 'image/png',
+          'transparent': 'true',
+          if (ticket != null && ticket.isNotEmpty) 'ticket': ticket,
+        },
+      ),
+    );
+  }
+
+  String? forestTileUrl(ForestSnapshot snapshot) {
+    if (snapshot.geoserverLayer case final layer? when layer.isNotEmpty) {
+      final base = ApiConfig.geoserverUrl.replaceAll(RegExp(r'/+$'), '');
+      final endpoint = base.endsWith('/wms') || base.endsWith('/ows')
+          ? base
+          : '$base/wms';
+      return _tileTemplate(
+        Uri.parse(endpoint).replace(
+          queryParameters: {
+            'service': 'WMS',
+            'version': '1.3.0',
+            'request': 'GetMap',
+            'layers': layer,
+            'styles': '',
+            'width': '256',
+            'height': '256',
+            'crs': 'EPSG:3857',
+            'format': 'image/png',
+            'transparent': 'true',
+            'tiled': 'true',
+            'bbox': '{bbox-epsg-3857}',
+          },
+        ),
+      );
+    }
+    final url = snapshot.geeTileUrl;
+    if (url == null || url.isEmpty) return null;
+    final uri = Uri.tryParse(url);
+    if (uri == null ||
+        uri.scheme != 'https' ||
+        uri.userInfo.isNotEmpty ||
+        uri.host != 'earthengine.googleapis.com' ||
+        !['{z}', '{x}', '{y}'].every(url.contains)) {
+      throw const FormatException('Invalid Google Earth Engine tile URL');
+    }
+    return url;
+  }
+
+  String _tileTemplate(Uri uri) =>
+      uri.toString().replaceAll('%7B', '{').replaceAll('%7D', '}');
 
   String get apiHost => Uri.parse(ApiConfig.baseUrl).host;
 
@@ -58,15 +135,33 @@ class MapRepository {
     final cacheKey = '$layerId|$access';
     final cached = _tileTicketCache[cacheKey];
     if (cached != null && !cached.isExpiringSoon) return cached.ticket;
-    final ticket = await _item(
-      () => dio.get(
-        ApiEndpoints.mapLayerTileTicket(layerId),
-        queryParameters: {'access': access},
-      ),
-      MapTileTicket.fromJson,
-    );
-    _tileTicketCache[cacheKey] = ticket;
-    return ticket.ticket;
+    if (_pendingTickets[cacheKey] case final pending?) return pending;
+    final generation = _ticketGeneration;
+    final request =
+        _item(
+          () => dio.get(
+            ApiEndpoints.mapLayerTileTicket(layerId),
+            queryParameters: {'access': access},
+          ),
+          MapTileTicket.fromJson,
+        ).then((ticket) {
+          if (generation != _ticketGeneration) {
+            throw const UnauthorizedException('Tài khoản đã thay đổi');
+          }
+          if (ticket.isExpiringSoon) {
+            throw const UnauthorizedException('Vé bản đồ đã hết hạn');
+          }
+          _tileTicketCache[cacheKey] = ticket;
+          return ticket.ticket;
+        });
+    _pendingTickets[cacheKey] = request;
+    try {
+      return await request;
+    } finally {
+      if (identical(_pendingTickets[cacheKey], request)) {
+        _pendingTickets.remove(cacheKey);
+      }
+    }
   }
 
   Future<List<LayerModel>> getLayers({String? category}) => _list(
@@ -81,35 +176,80 @@ class MapRepository {
   );
 
   Future<List<FloodScenarioModel>> getFloodScenarios({
-    bool activeOnly = false,
+    bool activeOnly = true,
     int limit = 100,
+  }) => _paged(
+    ApiEndpoints.floodScenarios,
+    FloodScenarioModel.fromJson,
+    limit: limit,
+    query: {'activeOnly': activeOnly},
+  );
+
+  Future<List<FloodRun>> getFloodRuns() => _paged(
+    ApiEndpoints.floodRuns,
+    FloodRun.fromJson,
+    limit: 50,
+    query: {'module': 'trend', 'mode': 'product'},
+  );
+
+  Future<List<FloodArtifact>> getFloodArtifacts() =>
+      _paged(ApiEndpoints.floodLayers, FloodArtifact.fromJson);
+
+  Future<List<FloodHydrologyLegend>> getFloodLegends() => _list(
+    () => dio.get(ApiEndpoints.floodLegends),
+    FloodHydrologyLegend.fromJson,
+  );
+
+  Future<Map<String, dynamic>> getFloodOverview() =>
+      _item(() => dio.get(ApiEndpoints.floodOverview), (json) => json);
+
+  Future<List<ForestSnapshot>> getForestClassificationHistory() =>
+      _paged(ApiEndpoints.forestHistory, ForestSnapshot.fromJson, limit: 24);
+
+  Future<ForestSnapshot?> getForestClassificationLatest() =>
+      _item(() => dio.get(ApiEndpoints.forestLatest), _snapshot);
+
+  Future<ForestSnapshot?> getForestClassificationSnapshot(int id) =>
+      _item(() => dio.get(ApiEndpoints.forestSnapshot(id)), _snapshot);
+
+  ForestSnapshot? _snapshot(Map<String, dynamic> data) {
+    final raw = data.containsKey('snapshot') ? data['snapshot'] : data;
+    if (raw == null) return null;
+    if (raw is! Map) throw const FormatException('Invalid forest snapshot');
+    return ForestSnapshot.fromJson(Map<String, dynamic>.from(raw));
+  }
+
+  Future<List<T>> _paged<T>(
+    String path,
+    T Function(Map<String, dynamic>) parse, {
+    int limit = 100,
+    Map<String, dynamic> query = const {},
   }) async {
+    final result = <T>[];
     try {
-      final response = await dio.get(
-        ApiEndpoints.floodScenarios,
-        queryParameters: {'activeOnly': activeOnly, 'limit': limit},
-      );
-      final body = response.data;
-      final Map<String, dynamic> env = body is Map<String, dynamic>
-          ? body
-          : Map<String, dynamic>.from(body as Map);
-      final dataObj = env['data'];
-      List items = [];
-      if (dataObj is Map && dataObj['items'] is List) {
-        items = dataObj['items'] as List;
-      } else if (dataObj is List) {
-        items = dataObj;
+      var page = 1;
+      while (true) {
+        final response = await dio.get(
+          path,
+          queryParameters: {...query, 'page': page, 'limit': limit},
+        );
+        final envelope = Map<String, dynamic>.from(response.data as Map);
+        final data = envelope['data'];
+        final items = data is Map ? data['items'] : data;
+        if (items is! List) {
+          throw const FormatException('Expected data.items list');
+        }
+        result.addAll(
+          items.map((e) => parse(Map<String, dynamic>.from(e as Map))),
+        );
+        final metadata = envelope['metadata'];
+        final pages = metadata is Map
+            ? int.tryParse('${metadata['totalPages']}')
+            : null;
+        if (items.isEmpty || pages == null || page >= pages) break;
+        page++;
       }
-      return items
-          .map(
-            (e) => FloodScenarioModel.fromJson(
-              Map<String, dynamic>.from(e as Map),
-            ),
-          )
-          .toList(growable: false);
-    } on DioException catch (error) {
-      if (CancelToken.isCancel(error)) rethrow;
-      throw mapErrorToAppException(error);
+      return result;
     } catch (error) {
       throw mapErrorToAppException(error);
     }

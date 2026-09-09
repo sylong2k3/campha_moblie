@@ -14,6 +14,7 @@ import '../../../app/router/route_names.dart';
 import '../../../app/theme/app_motion.dart';
 import '../../../core/error/error_l10n.dart';
 import '../../../core/l10n/l10n.dart';
+import '../../../core/location/location_helper.dart';
 import '../../../core/network/api_config.dart';
 import '../../shared/presentation/app_feedback.dart';
 import '../../tools/domain/field_tools_models.dart';
@@ -164,56 +165,46 @@ class _CreateFieldReportScreenState
 
   Future<void> _locate() async {
     final l10n = context.l10n;
-    try {
-      if (!await geo.Geolocator.isLocationServiceEnabled()) {
-        if (mounted) {
-          setState(() => _locationProblem = _LocationProblem.serviceDisabled);
-        }
-        return;
-      }
-      var permission = await geo.Geolocator.checkPermission();
+    if (_locationProblem == null) {
+      final permission = await geo.Geolocator.checkPermission();
       if (permission == geo.LocationPermission.denied) {
-        // Không hỏi lại primer khi người dùng vừa quay về từ Cài đặt hệ thống:
-        // họ đã ở giữa luồng khắc phục, dialog thứ hai chỉ gây rối.
-        if (_locationProblem == null) {
-          final proceed = await _confirmPermission(
-            title: l10n.locationWeatherTitle,
-            body: l10n.locationPrimer,
-          );
-          if (!proceed || !mounted) return;
-        }
-        permission = await geo.Geolocator.requestPermission();
-      }
-      if (permission == geo.LocationPermission.deniedForever) {
-        if (mounted) {
-          setState(() => _locationProblem = _LocationProblem.deniedForever);
-        }
-        return;
-      }
-      if (permission == geo.LocationPermission.denied) {
-        if (mounted) {
-          setState(() => _locationProblem = _LocationProblem.denied);
-        }
-        return;
-      }
-      if (mounted) {
-        setState(() {
-          _locating = true;
-          _locationProblem = null;
-        });
-      }
-      geo.Position? position;
-      try {
-        position = await geo.Geolocator.getCurrentPosition(
-          locationSettings: const geo.LocationSettings(
-            accuracy: geo.LocationAccuracy.high,
-            timeLimit: Duration(seconds: 10),
-          ),
+        final proceed = await _confirmPermission(
+          title: l10n.locationWeatherTitle,
+          body: l10n.locationPrimer,
         );
-      } catch (_) {
-        position = await geo.Geolocator.getLastKnownPosition();
-        if (position == null) rethrow;
+        if (!proceed || !mounted) return;
       }
+    }
+    if (mounted) {
+      setState(() {
+        _locating = true;
+        _locationProblem = null;
+      });
+    }
+    try {
+      final result = await getCurrentLocation();
+      if (!mounted) return;
+      if (!result.isSuccess) {
+        setState(() {
+          _locationProblem = switch (result.failure!) {
+            LocationFailure.serviceDisabled => _LocationProblem.serviceDisabled,
+            LocationFailure.permissionDeniedForever =>
+              _LocationProblem.deniedForever,
+            LocationFailure.permissionDenied => _LocationProblem.denied,
+            LocationFailure.timeout || LocationFailure.unavailable => null,
+          };
+        });
+        if (result.failure == LocationFailure.timeout ||
+            result.failure == LocationFailure.unavailable) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(l10n.locationAccuracyUnavailable)),
+            );
+          }
+        }
+        return;
+      }
+      final position = result.position!;
       await ref
           .read(reportComposerProvider.notifier)
           .setLocation(

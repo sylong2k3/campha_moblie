@@ -6,7 +6,9 @@ import 'package:geolocator/geolocator.dart' as geo;
 
 import '../../../core/error/error_l10n.dart';
 import '../../../core/l10n/l10n.dart';
+import '../../../core/location/location_helper.dart';
 import '../../tools/domain/field_tools_controller.dart';
+import '../../tools/domain/field_tools_models.dart';
 import '../../tools/presentation/map_tool_panel_shell.dart';
 import '../domain/route_model.dart';
 
@@ -201,9 +203,23 @@ class _RouteSheetState extends ConsumerState<RouteSheet>
             children: [
               TextButton.icon(
                 key: const ValueKey('route-use-gps'),
-                onPressed: state.location == null
-                    ? () => _useGps(context, controller)
-                    : controller.useLocationAsRouteStart,
+                onPressed: () async {
+                  if (state.location == null) {
+                    await _useGps(context, controller);
+                  } else {
+                    controller.useLocationAsRouteStart();
+                    final err = ref.read(fieldToolsProvider).error;
+                    if (err != null && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            err.localizedErrorMessage(context.l10n),
+                          ),
+                        ),
+                      );
+                    }
+                  }
+                },
                 icon: state.locationStatus == LocationStatus.locating
                     ? const SizedBox.square(
                         dimension: 16,
@@ -245,52 +261,54 @@ class _RouteSheetState extends ConsumerState<RouteSheet>
     BuildContext context,
     FieldToolsController controller,
   ) async {
-    if (!await geo.Geolocator.isLocationServiceEnabled()) {
-      if (context.mounted) {
-        await _showLocationRecovery(
-          context,
-          context.l10n.locationServiceOff,
-          geo.Geolocator.openLocationSettings,
-        );
+    final result = await getCurrentLocation();
+    if (!context.mounted) return;
+    if (!result.isSuccess) {
+      switch (result.failure!) {
+        case LocationFailure.serviceDisabled:
+          await _showLocationRecovery(
+            context,
+            context.l10n.locationServiceOff,
+            geo.Geolocator.openLocationSettings,
+          );
+        case LocationFailure.permissionDeniedForever:
+          await _showLocationRecovery(
+            context,
+            context.l10n.locationDeniedForever,
+            geo.Geolocator.openAppSettings,
+          );
+        case LocationFailure.permissionDenied:
+          await _showLocationRecovery(
+            context,
+            context.l10n.locationDenied,
+            geo.Geolocator.openAppSettings,
+          );
+        case LocationFailure.timeout:
+        case LocationFailure.unavailable:
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(context.l10n.locationAccuracyUnavailable),
+              ),
+            );
+          }
       }
       return;
     }
-    final permission = await geo.Geolocator.checkPermission();
-    if (!context.mounted) return;
-    if (permission == geo.LocationPermission.deniedForever) {
-      await _showLocationRecovery(
-        context,
-        context.l10n.locationDeniedForever,
-        geo.Geolocator.openAppSettings,
+    final pos = result.position!;
+    controller.setGpsLocation(
+      coordinate: GeoCoordinate(pos.longitude, pos.latitude),
+      accuracyMeters: pos.accuracy,
+      timestamp: pos.timestamp,
+    );
+    controller.useLocationAsRouteStart();
+    final err = ref.read(fieldToolsProvider).error;
+    if (err != null && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(err.localizedErrorMessage(context.l10n))),
       );
-      return;
     }
-    if (permission == geo.LocationPermission.denied &&
-        !await _confirmLocationPrimer(context)) {
-      return;
-    }
-    await controller.locate();
   }
-
-  Future<bool> _confirmLocationPrimer(BuildContext context) async =>
-      await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: Text(dialogContext.l10n.locationWeatherTitle),
-          content: Text(dialogContext.l10n.locationPrimer),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: Text(dialogContext.l10n.commonCancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: Text(dialogContext.l10n.commonContinue),
-            ),
-          ],
-        ),
-      ) ??
-      false;
 
   Future<void> _showLocationRecovery(
     BuildContext context,

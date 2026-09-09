@@ -74,11 +74,25 @@ class FieldReportRepository {
   }
 
   Future<FieldReport> getDetail(String id, {CancelToken? cancelToken}) async {
-    final response = await _dio.get<Map<String, dynamic>>(
-      ApiEndpoints.fieldReportDetail(id),
-      cancelToken: cancelToken,
-    );
-    return FieldReport.fromJson(_map(_body(response)['data'], 'data'));
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        ApiEndpoints.fieldReportDetail(id),
+        cancelToken: cancelToken,
+      );
+      return FieldReport.fromJson(_map(_body(response)['data'], 'data'));
+    } on DioException catch (error) {
+      final status = error.response?.statusCode;
+      if (status == 404 || status == 401 || status == 403) {
+        final publicResponse = await _dio.get<Map<String, dynamic>>(
+          '${ApiEndpoints.fieldReportsPublic}/$id',
+          cancelToken: cancelToken,
+        );
+        return FieldReport.fromJson(
+          _map(_body(publicResponse)['data'], 'data'),
+        );
+      }
+      rethrow;
+    }
   }
 
   Future<FieldReport> create({

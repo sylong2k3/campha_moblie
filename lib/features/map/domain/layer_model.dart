@@ -172,7 +172,7 @@ class MapTileTicket {
   final String ticket;
   final DateTime expiresAt;
 
-  static const _refreshMargin = Duration(seconds: 30);
+  static const _refreshMargin = Duration(seconds: 60);
 
   /// true khi vé đã hết hạn hoặc sắp hết hạn trong [_refreshMargin] tới —
   /// dùng để chủ động lấy vé mới trước khi tile request bị 401.
