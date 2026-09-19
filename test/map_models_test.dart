@@ -208,4 +208,101 @@ void main() {
     expect(hydro.isRaster, isFalse);
     expect(flood.isRaster, isTrue);
   });
+
+  test('parses isEnableDefault from various API field formats', () {
+    final camelCase = LayerModel.fromJson({
+      'id': '1',
+      'code': 'layer1',
+      'nameVi': 'Lớp 1',
+      'category': 'dia_danh',
+      'geometryType': 'POINT',
+      'storageKind': 'postgis',
+      'srid': 4326,
+      'isPublic': true,
+      'isEnableDefault': true,
+    });
+    final snakeCase = LayerModel.fromJson({
+      'id': '2',
+      'code': 'layer2',
+      'nameVi': 'Lớp 2',
+      'category': 'giao_thong',
+      'geometryType': 'LINESTRING',
+      'storageKind': 'postgis',
+      'srid': 4326,
+      'isPublic': true,
+      'is_enable_default': true,
+    });
+    final visibleByDefault = LayerModel.fromJson({
+      'id': '3',
+      'code': 'layer3',
+      'nameVi': 'Lớp 3',
+      'category': 'quy_hoach',
+      'geometryType': 'POLYGON',
+      'storageKind': 'postgis',
+      'srid': 4326,
+      'isPublic': true,
+      'defaultStyle': {'visible_by_default': true},
+    });
+    final disabled = LayerModel.fromJson({
+      'id': '4',
+      'code': 'layer4',
+      'nameVi': 'Lớp 4',
+      'category': 'khac',
+      'geometryType': 'POINT',
+      'storageKind': 'postgis',
+      'srid': 4326,
+      'isPublic': true,
+      'isEnableDefault': false,
+    });
+
+    expect(camelCase.isEnableDefault, isTrue);
+    expect(snakeCase.isEnableDefault, isTrue);
+    expect(visibleByDefault.isEnableDefault, isTrue);
+    expect(disabled.isEnableDefault, isFalse);
+  });
+
+  test('defaultStyle color takes precedence over legend and default palette', () {
+    final layer = LayerModel.fromJson({
+      'id': '10',
+      'code': 'boundary_styled',
+      'nameVi': 'Ranh giới',
+      'category': 'ranh_gioi',
+      'geometryType': 'LINESTRING',
+      'storageKind': 'postgis',
+      'srid': 4326,
+      'isPublic': true,
+      'defaultStyle': {
+        'strokeColor': '#FF0055',
+        'strokeWidth': 4.0,
+      },
+      'legend': {
+        'color': '#00AA00',
+      },
+    });
+
+    expect(layer.displayColor, const Color(0xFFFF0055));
+    expect(layer.customStrokeColor, const Color(0xFFFF0055));
+    expect(layer.customStrokeWidth, 4.0);
+  });
+
+  test('legend entries color takes precedence over default palette', () {
+    final layer = LayerModel.fromJson({
+      'id': '11',
+      'code': 'cp_do_thi_2001',
+      'nameVi': 'Lớp phủ đô thị',
+      'category': 'lop-phu',
+      'geometryType': 'RASTER',
+      'storageKind': 'geotiff_minio',
+      'srid': 32648,
+      'isPublic': true,
+      'legend': {
+        'entries': [
+          {'label': 'Mặt nước', 'color': '#0086FF'},
+          {'label': 'Đất ở', 'color': '#FF9393'},
+        ],
+      },
+    });
+
+    expect(layer.displayColor, const Color(0xFF0086FF));
+  });
 }

@@ -8,6 +8,8 @@ import 'package:geolocator/geolocator.dart' as geo;
 import 'package:go_router/go_router.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
+import '../../../core/location/map_defaults.dart';
+
 import '../../../app/router/route_names.dart';
 import '../../../core/error/error_l10n.dart';
 import '../../../core/l10n/l10n.dart';
@@ -1165,6 +1167,11 @@ class _ReportMapState extends State<_ReportMap> {
   String? _fittedReportSignature;
   final _reportsByAnnotationId = <String, FieldReport>{};
 
+  static final _camPhaFallback = (
+    center: MapDefaults.center,
+    zoom: 12.0,
+  );
+
   ({Point center, double zoom}) _viewportForReports() {
     assert(widget.items.isNotEmpty);
     var minLongitude = widget.items.first.location.longitude;
@@ -1180,6 +1187,11 @@ class _ReportMapState extends State<_ReportMap> {
 
     final latitude = (minLatitude + maxLatitude) / 2;
     final longitude = (minLongitude + maxLongitude) / 2;
+
+    // Fallback về Cẩm Phả nếu center tính ra nằm ngoài bounds.
+    final computed = GeoCoordinate(longitude, latitude);
+    if (!computed.isInCamPhaBounds) return _camPhaFallback;
+
     final longitudeSpan =
         (maxLongitude - minLongitude).abs() *
         math.cos(latitude * math.pi / 180);

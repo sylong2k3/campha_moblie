@@ -15,7 +15,73 @@ LayerModel _floodLayer() => LayerModel(
   legend: const {},
 );
 
+Map<String, dynamic> _layerJson() => {
+  'id': '1',
+  'code': 'test_layer',
+  'nameVi': 'Lớp kiểm tra',
+  'category': 'khac',
+  'geometryType': 'LINESTRING',
+  'storageKind': 'postgis',
+  'srid': 4326,
+};
+
 void main() {
+  test('explicit false overrides legacy default flags', () {
+    expect(
+      LayerModel.fromJson({
+        ..._layerJson(),
+        'isEnableDefault': false,
+        'is_enable_default': true,
+        'defaultStyle': {'visible_by_default': true},
+      }).isEnableDefault,
+      isFalse,
+    );
+    expect(
+      LayerModel.fromJson({
+        ..._layerJson(),
+        'is_enable_default': false,
+        'metadata': {
+          'defaultStyle': {'visible_by_default': true},
+        },
+      }).isEnableDefault,
+      isFalse,
+    );
+  });
+
+  test(
+    'missing flags fall back to metadata and malformed maps are rejected',
+    () {
+      expect(
+        LayerModel.fromJson({
+          ..._layerJson(),
+          'metadata': {
+            'default_style': {'visible_by_default': true},
+          },
+        }).isEnableDefault,
+        isTrue,
+      );
+      for (final key in ['metadata', 'defaultStyle']) {
+        expect(
+          () => LayerModel.fromJson({..._layerJson(), key: 'invalid'}),
+          throwsFormatException,
+        );
+      }
+    },
+  );
+
+  test('displayColor skips invalid entries and supports colorHex', () {
+    final layer = LayerModel.fromJson({
+      ..._layerJson(),
+      'legend': {
+        'entries': [
+          {'label': 'Invalid', 'color': 'not-a-color'},
+          {'label': 'Valid', 'colorHex': '#123456'},
+        ],
+      },
+    });
+    expect(layer.displayColor, const Color(0xFF123456));
+  });
+
   test(
     'getLegendItems prefers server-provided colors even for flood layers',
     () {
@@ -34,35 +100,70 @@ void main() {
     },
   );
 
-  test('getLegendItems falls back to the default preset only when server '
-      'legend is empty for a flood/land-cover layer', () {
+  test('getLegendItems removes duplicate API entries', () {
+    final legend = LayerLegend.fromJson({
+      'layerId': '1',
+      'code': 'duplicate',
+      'nameVi': 'Lớp trùng',
+      'legend': {
+        'entries': [
+          {'label': 'Mặt nước', 'color': '#0086FF'},
+          {'label': 'Mặt nước', 'color': '#0086FF'},
+        ],
+      },
+    });
+
+    final items = getLegendItems(legend);
+
+    expect(items, hasLength(1));
+    expect(items.single.label, 'Mặt nước');
+  });
+
+  test('deduplicateLegendItems removes duplicates across sources', () {
+    const item = LegendColorItem(
+      label: 'Ranh giới',
+      color: Color(0xFF123456),
+      geometryType: LegendGeometryType.line,
+    );
+
+    expect(deduplicateLegendItems([item, item]), hasLength(1));
+  });
+
+  test('getLegendItems identifies a layer when API legend is null', () {
     final legend = LayerLegend.fromJson({
       'layerId': '1',
       'code': 'lop_phu_sau_ngap_2015',
       'nameVi': 'Lớp phủ sau ngập Cẩm Phả năm 2015',
       'legend': <String, dynamic>{},
     });
+    final layer = _floodLayer();
 
-    final items = getLegendItems(legend, _floodLayer());
+    final items = getLegendItems(legend, layer);
 
-    expect(items, defaultFloodLandCoverLegendItems);
+    expect(items, hasLength(1));
+    expect(items.single.label, layer.nameVi);
+    expect(items.single.color, layer.displayColor);
+    expect(items.single.isRasterGeometry, isTrue);
   });
 
-  test('getLegendItems returns an empty list for non flood line/polygon layers with no '
-      'server legend, instead of the flood preset', () {
-    final legend = LayerLegend.fromJson({
-      'layerId': '2',
-      'code': 'ranhgioi_campha',
-      'nameVi': 'Ranh giới hành chính Cẩm Phả',
-      'legend': <String, dynamic>{},
-    });
+  test(
+    'getLegendItems returns an empty list for non flood line/polygon layers with no '
+    'server legend, instead of the flood preset',
+    () {
+      final legend = LayerLegend.fromJson({
+        'layerId': '2',
+        'code': 'ranhgioi_campha',
+        'nameVi': 'Ranh giới hành chính Cẩm Phả',
+        'legend': <String, dynamic>{},
+      });
 
-    final items = getLegendItems(legend);
+      final items = getLegendItems(legend);
 
-    expect(items, isEmpty);
-  });
+      expect(items, isEmpty);
+    },
+  );
 
-  test('getLegendItems returns point legend item with layer name and color for point layer', () {
+  test('getLegendItems identifies point layer without API legend', () {
     const pointLayer = LayerModel(
       id: 'point-1',
       code: 'diem_ngap',
@@ -84,61 +185,96 @@ void main() {
     final items = getLegendItems(legend, pointLayer);
 
     expect(items, hasLength(1));
-    expect(items.first.label, 'Điểm ngập úng đô thị');
-    expect(items.first.color, pointLayer.displayColor);
-    expect(items.first.isPoint, isTrue);
-    expect(items.first.isPointGeometry, isTrue);
+    expect(items.single.label, pointLayer.nameVi);
+    expect(items.single.color, pointLayer.displayColor);
+    expect(items.single.isPointGeometry, isTrue);
   });
 
-  test('getLegendItems returns line and polygon items with appropriate geometryType', () {
-    const lineLayer = LayerModel(
-      id: 'line-1',
-      code: 'ranh_gioi',
-      nameVi: 'Ranh giới hành chính',
-      category: 'ranh_gioi',
-      geometryType: 'LINESTRING',
-      storageKind: 'postgis',
-      srid: 4326,
-      isPublic: true,
-      legend: {},
+  test(
+    'getLegendItems returns line and polygon items with appropriate geometryType',
+    () {
+      const lineLayer = LayerModel(
+        id: 'line-1',
+        code: 'ranh_gioi',
+        nameVi: 'Ranh giới hành chính',
+        category: 'ranh_gioi',
+        geometryType: 'LINESTRING',
+        storageKind: 'postgis',
+        srid: 4326,
+        isPublic: true,
+        legend: {},
+      );
+      const polygonLayer = LayerModel(
+        id: 'poly-1',
+        code: 'khu_dan_cu',
+        nameVi: 'Khu dân cư đô thị',
+        category: 'quy_hoach',
+        geometryType: 'POLYGON',
+        storageKind: 'postgis',
+        srid: 4326,
+        isPublic: true,
+        legend: {},
+      );
+
+      final lineLegend = LayerLegend.fromJson({
+        'layerId': 'line-1',
+        'code': 'ranh_gioi',
+        'nameVi': 'Ranh giới hành chính',
+        'legend': <String, dynamic>{},
+      });
+      final polyLegend = LayerLegend.fromJson({
+        'layerId': 'poly-1',
+        'code': 'khu_dan_cu',
+        'nameVi': 'Khu dân cư đô thị',
+        'legend': <String, dynamic>{},
+      });
+
+      final lineItems = getLegendItems(lineLegend, lineLayer);
+      final polyItems = getLegendItems(polyLegend, polygonLayer);
+
+      expect(lineItems, hasLength(1));
+      expect(lineItems.single.label, lineLayer.nameVi);
+      expect(lineItems.single.isLineGeometry, isTrue);
+      expect(polyItems, hasLength(1));
+      expect(polyItems.single.label, polygonLayer.nameVi);
+      expect(polyItems.single.isPolygonGeometry, isTrue);
+    },
+  );
+
+  testWidgets('legend close has accessible 48dp target and hides the card', (
+    tester,
+  ) async {
+    var visible = true;
+    var closes = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) => visible
+                ? LayerLegendCard(
+                    title: 'Chú giải',
+                    items: const [
+                      LegendColorItem(label: 'Lớp', color: Colors.blue),
+                    ],
+                    onClose: () {
+                      closes++;
+                      setState(() => visible = false);
+                    },
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ),
+      ),
     );
-    const polygonLayer = LayerModel(
-      id: 'poly-1',
-      code: 'khu_dan_cu',
-      nameVi: 'Khu dân cư đô thị',
-      category: 'quy_hoach',
-      geometryType: 'POLYGON',
-      storageKind: 'postgis',
-      srid: 4326,
-      isPublic: true,
-      legend: {},
-    );
-
-    final lineLegend = LayerLegend.fromJson({
-      'layerId': 'line-1',
-      'code': 'ranh_gioi',
-      'nameVi': 'Ranh giới hành chính',
-      'legend': <String, dynamic>{},
-    });
-    final polyLegend = LayerLegend.fromJson({
-      'layerId': 'poly-1',
-      'code': 'khu_dan_cu',
-      'nameVi': 'Khu dân cư đô thị',
-      'legend': <String, dynamic>{},
-    });
-
-    final lineItems = getLegendItems(lineLegend, lineLayer);
-    final polyItems = getLegendItems(polyLegend, polygonLayer);
-
-    expect(lineItems, hasLength(1));
-    expect(lineItems.first.label, 'Ranh giới hành chính');
-    expect(lineItems.first.isLineGeometry, isTrue);
-    expect(lineItems.first.color, lineLayer.displayColor);
-
-    expect(polyItems, hasLength(1));
-    expect(polyItems.first.label, 'Khu dân cư đô thị');
-    expect(polyItems.first.isPolygonGeometry, isTrue);
-    expect(polyItems.first.color, polygonLayer.displayColor);
+    final close = find.byKey(const ValueKey('map-legend-close'));
+    expect(tester.getSize(close).width, greaterThanOrEqualTo(48));
+    expect(tester.getSize(close).height, greaterThanOrEqualTo(48));
+    expect(tester.widget<IconButton>(close).tooltip, 'Close');
+    await tester.tap(close);
+    await tester.pumpAndSettle();
+    expect(closes, 1);
+    expect(find.byType(LayerLegendCard), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(
@@ -152,7 +288,12 @@ void main() {
               width: 360,
               child: LayerLegendCard(
                 title: 'Lớp phủ sau ngập',
-                items: defaultFloodLandCoverLegendItems,
+                items: const [
+                  LegendColorItem(label: 'A', color: Colors.blue),
+                  LegendColorItem(label: 'B', color: Colors.red),
+                  LegendColorItem(label: 'C', color: Colors.green),
+                  LegendColorItem(label: 'D', color: Colors.orange),
+                ],
               ),
             ),
           ),
@@ -194,4 +335,69 @@ void main() {
       expect(find.text('Vuốt ngang để xem thêm'), findsNothing);
     },
   );
+
+  testWidgets('LayerLegendCard renders nothing when API items are empty', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: LayerLegendCard(title: 'Không có chú giải', items: []),
+        ),
+      ),
+    );
+
+    expect(find.text('Không có chú giải'), findsNothing);
+    expect(find.byType(ListView), findsNothing);
+  });
+
+  test('getLegendItems parses structured entries array from API', () {
+    final legend = LayerLegend.fromJson({
+      'layerId': '186',
+      'code': 'cp_do_thi_2001',
+      'nameVi': 'Lớp phủ đô thị',
+      'legend': {
+        'entries': [
+          {'label': 'Mặt nước', 'color': '#0086FF'},
+          {'label': 'Đất ở', 'color': '#FF9393'},
+          {'label': 'Đất lâm nghiệp', 'color': '#006000'},
+        ],
+      },
+    });
+
+    final items = getLegendItems(legend);
+
+    expect(items, hasLength(3));
+    expect(items[0].label, 'Mặt nước');
+    expect(items[0].color, const Color(0xFF0086FF));
+    expect(items[1].label, 'Đất ở');
+    expect(items[1].color, const Color(0xFFFF9393));
+    expect(items[2].label, 'Đất lâm nghiệp');
+    expect(items[2].color, const Color(0xFF006000));
+  });
+
+  test('getLegendItemsForLayer extracts entries directly from LayerModel', () {
+    final layer = LayerModel.fromJson({
+      'id': '186',
+      'code': 'cp_do_thi_2001',
+      'nameVi': 'Lớp phủ đô thị',
+      'category': 'lop-phu',
+      'geometryType': 'RASTER',
+      'storageKind': 'geotiff_minio',
+      'srid': 32648,
+      'isPublic': true,
+      'legend': {
+        'entries': [
+          {'label': 'Mặt nước', 'color': '#0086FF'},
+          {'label': 'Đất ở', 'color': '#FF9393'},
+        ],
+      },
+    });
+
+    final items = getLegendItemsForLayer(layer);
+
+    expect(items, hasLength(2));
+    expect(items[0].label, 'Mặt nước');
+    expect(items[0].color, const Color(0xFF0086FF));
+  });
 }

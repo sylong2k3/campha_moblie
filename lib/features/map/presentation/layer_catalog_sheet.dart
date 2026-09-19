@@ -309,9 +309,48 @@ class _LayerRow extends ConsumerWidget {
           key: ValueKey('layer-toggle-${layer.id}'),
           value: active,
           onChanged: (value) => controller.setLayerVisible(layer.id, value),
-          secondary: Icon(icon, color: color),
-          title: Text(layer.nameVi),
-          subtitle: Text(layer.code),
+          secondary: Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+              border: Border.all(color: color.withValues(alpha: 0.45)),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  layer.nameVi,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (layer.isEnableDefault)
+                Container(
+                  margin: const EdgeInsets.only(left: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 1.5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'Mặc định',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          subtitle: Text(layer.code, overflow: TextOverflow.ellipsis),
         ),
         if (active)
           Padding(

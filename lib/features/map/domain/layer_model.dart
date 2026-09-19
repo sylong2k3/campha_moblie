@@ -32,6 +32,21 @@ const List<Color> defaultLayerColorPalette = [
   Color(0xFF15803D), // Deep Green (Đất canh tác nông nghiệp)
 ];
 
+/// Chuyển đổi mã màu hex (#RRGGBB, #AARRGGBB, #RGB) sang đối tượng Color.
+Color? parseHexColor(dynamic hex) {
+  if (hex == null) return null;
+  var clean = hex.toString().replaceAll('#', '').replaceAll('0x', '').trim();
+  if (clean.length == 3) {
+    clean = clean.split('').map((c) => '$c$c').join();
+  }
+  if (clean.length == 6) clean = 'FF$clean';
+  if (clean.length == 8) {
+    final val = int.tryParse(clean, radix: 16);
+    if (val != null) return Color(val);
+  }
+  return null;
+}
+
 class LayerModel {
   const LayerModel({
     required this.id,
@@ -49,6 +64,8 @@ class LayerModel {
     this.styleName,
     this.minZoom,
     this.maxZoom,
+    this.isEnableDefault = false,
+    this.defaultStyle,
   });
 
   final String id;
@@ -66,6 +83,8 @@ class LayerModel {
   final bool isPublic;
   final bool canEdit;
   final List<String> editableFields;
+  final bool isEnableDefault;
+  final Map<String, dynamic>? defaultStyle;
 
   bool get isRaster =>
       geometryType.toUpperCase() == 'RASTER' || storageKind == 'geotiff_minio';
@@ -73,21 +92,70 @@ class LayerModel {
   bool get isLine => geometryType.toUpperCase().contains('LINE');
   bool get isPolygon => geometryType.toUpperCase().contains('POLYGON');
 
+  Color? get customPointColor =>
+      parseHexColor(defaultStyle?['circleColor']) ??
+      parseHexColor(defaultStyle?['color']);
+
+  Color? get customStrokeColor =>
+      parseHexColor(defaultStyle?['strokeColor']) ??
+      parseHexColor(defaultStyle?['lineColor']) ??
+      parseHexColor(defaultStyle?['color']);
+
+  Color? get customFillColor =>
+      parseHexColor(defaultStyle?['fillColor']) ??
+      parseHexColor(defaultStyle?['color']);
+
+  Color? get customCircleStrokeColor =>
+      parseHexColor(defaultStyle?['circleStrokeColor']);
+
+  double? get customStrokeWidth => _doubleOrNull(defaultStyle?['strokeWidth']);
+  double? get customCircleRadius =>
+      _doubleOrNull(defaultStyle?['circleRadius']);
+  double? get customCircleStrokeWidth =>
+      _doubleOrNull(defaultStyle?['circleStrokeWidth']);
+  double? get customFillOpacity => _doubleOrNull(defaultStyle?['fillOpacity']);
+  double? get customStrokeOpacity =>
+      _doubleOrNull(defaultStyle?['strokeOpacity']);
+  double? get customCircleOpacity =>
+      _doubleOrNull(defaultStyle?['circleOpacity']);
+
   Color get displayColor {
+    // 1. Ưu tiên cấu hình từ defaultStyle theo hình học
+    Color? styleColor;
+    if (isPoint) {
+      styleColor = customPointColor ?? customStrokeColor ?? customFillColor;
+    } else if (isLine) {
+      styleColor = customStrokeColor ?? customFillColor;
+    } else if (isPolygon) {
+      styleColor = customFillColor ?? customStrokeColor;
+    } else {
+      styleColor = customFillColor ?? customStrokeColor ?? customPointColor;
+    }
+    if (styleColor != null) return styleColor;
+
+    // 2. Ưu tiên cấu hình từ legend.entries (danh sách entries chuẩn từ API)
+    final entries = legend['entries'];
+    if (entries is List) {
+      for (final entry in entries) {
+        if (entry is! Map) continue;
+        final color = parseHexColor(
+          entry['color'] ?? entry['fill'] ?? entry['hex'] ?? entry['colorHex'],
+        );
+        if (color != null) return color;
+      }
+    }
+
+    // 3. Đọc từ các trường color trực tiếp trong legend
     final hex =
         legend['color']?.toString() ??
         legend['fillColor']?.toString() ??
         legend['strokeColor']?.toString() ??
+        legend['circleColor']?.toString() ??
         legend['colorHex']?.toString();
-    if (hex != null && hex.isNotEmpty) {
-      var clean = hex.replaceAll('#', '').replaceAll('0x', '').trim();
-      if (clean.length == 6) clean = 'FF$clean';
-      if (clean.length == 8) {
-        final val = int.tryParse(clean, radix: 16);
-        if (val != null) return Color(val);
-      }
-    }
+    final legendColor = parseHexColor(hex);
+    if (legendColor != null) return legendColor;
 
+    // 4. Fallback: Bảng màu mặc định phân giải cao
     final seedStr = '${category}_${code}_$id';
     final hash = seedStr.codeUnits.fold(
       0,
@@ -96,39 +164,71 @@ class LayerModel {
     return defaultLayerColorPalette[hash % defaultLayerColorPalette.length];
   }
 
-  factory LayerModel.fromJson(Map<String, dynamic> json) => LayerModel(
-    id: _requiredString(json, 'id'),
-    code: _requiredString(json, 'code'),
-    nameVi: _requiredString(json, 'nameVi'),
-    category:
-        (json['categoryName'] ??
+  factory LayerModel.fromJson(Map<String, dynamic> json) {
+    final rawLegend =
+        json['legend'] ?? json['legendConfig'] ?? json['legend_config'];
+    Map<String, dynamic> legendMap;
+    if (rawLegend is Map) {
+      legendMap = _asMap(rawLegend, 'legend');
+    } else if (rawLegend is List) {
+      legendMap = {'entries': rawLegend};
+    } else {
+      legendMap = const {};
+    }
+
+    final metadata = _optionalMap(json['metadata']);
+    final rawDefaultStyle =
+        json['defaultStyle'] ??
+        json['default_style'] ??
+        metadata['defaultStyle'] ??
+        metadata['default_style'];
+    final defaultStyleMap = rawDefaultStyle == null
+        ? null
+        : _asMap(rawDefaultStyle, 'defaultStyle');
+
+    // Cờ false rõ ràng từ API không được trường tương thích cũ ghi đè.
+    final isDefault =
+        (json['isEnableDefault'] ??
+            json['is_enable_default'] ??
+            defaultStyleMap?['visible_by_default']) ==
+        true;
+
+    return LayerModel(
+      id: _requiredString(json, 'id'),
+      code: _requiredString(json, 'code'),
+      nameVi: _requiredString(json, 'nameVi'),
+      category:
+          (json['categoryName'] ??
+                      json['category_name'] ??
+                      json['categoryNameVi'] ??
+                      json['category_name_vi'] ??
+                      json['category'])
+                  ?.toString()
+                  .trim()
+                  .isNotEmpty ==
+              true
+          ? (json['categoryName'] ??
                     json['category_name'] ??
                     json['categoryNameVi'] ??
                     json['category_name_vi'] ??
                     json['category'])
-                ?.toString()
-                .trim()
-                .isNotEmpty ==
-            true
-        ? (json['categoryName'] ??
-                  json['category_name'] ??
-                  json['categoryNameVi'] ??
-                  json['category_name_vi'] ??
-                  json['category'])
-              .toString()
-        : 'khac',
-    geometryType: _requiredString(json, 'geometryType'),
-    storageKind: _requiredString(json, 'storageKind'),
-    srid: _int(json['srid']),
-    geoserverLayer: json['geoserverLayer']?.toString(),
-    styleName: json['styleName']?.toString(),
-    minZoom: _doubleOrNull(json['minZoom']),
-    maxZoom: _doubleOrNull(json['maxZoom']),
-    legend: _optionalMap(json['legend']),
-    isPublic: json['isPublic'] == true,
-    canEdit: json['canEdit'] == true,
-    editableFields: _stringList(json['editableFields']),
-  );
+                .toString()
+          : 'khac',
+      geometryType: _requiredString(json, 'geometryType'),
+      storageKind: _requiredString(json, 'storageKind'),
+      srid: _int(json['srid']),
+      geoserverLayer: json['geoserverLayer']?.toString(),
+      styleName: json['styleName']?.toString(),
+      minZoom: _doubleOrNull(json['minZoom']),
+      maxZoom: _doubleOrNull(json['maxZoom']),
+      legend: legendMap,
+      isPublic: json['isPublic'] == true,
+      canEdit: json['canEdit'] == true,
+      editableFields: _stringList(json['editableFields']),
+      isEnableDefault: isDefault,
+      defaultStyle: defaultStyleMap,
+    );
+  }
 }
 
 class LayerLegend {
@@ -152,15 +252,27 @@ class LayerLegend {
 
   bool get isEmpty => legend.isEmpty;
 
-  factory LayerLegend.fromJson(Map<String, dynamic> json) => LayerLegend(
-    layerId: _requiredString(json, 'layerId'),
-    code: _requiredString(json, 'code'),
-    nameVi: _requiredString(json, 'nameVi'),
-    styleName: json['styleName']?.toString(),
-    minZoom: _doubleOrNull(json['minZoom']),
-    maxZoom: _doubleOrNull(json['maxZoom']),
-    legend: _optionalMap(json['legend']),
-  );
+  factory LayerLegend.fromJson(Map<String, dynamic> json) {
+    final rawLegend =
+        json['legend'] ?? json['legendConfig'] ?? json['legend_config'];
+    Map<String, dynamic> legendMap;
+    if (rawLegend is Map) {
+      legendMap = _asMap(rawLegend, 'legend');
+    } else if (rawLegend is List) {
+      legendMap = {'entries': rawLegend};
+    } else {
+      legendMap = const {};
+    }
+    return LayerLegend(
+      layerId: _requiredString(json, 'layerId'),
+      code: _requiredString(json, 'code'),
+      nameVi: _requiredString(json, 'nameVi'),
+      styleName: json['styleName']?.toString(),
+      minZoom: _doubleOrNull(json['minZoom']),
+      maxZoom: _doubleOrNull(json['maxZoom']),
+      legend: legendMap,
+    );
+  }
 }
 
 /// Vé truy cập tile WMS/WFS cho layer không `isPublic` — `RasterSource` của

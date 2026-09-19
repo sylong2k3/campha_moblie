@@ -88,6 +88,54 @@ void main() {
     expect(find.text('Bật tất cả'), findsOneWidget);
     expect(find.text('Tắt tất cả'), findsNothing);
   });
+
+  testWidgets('displays default enable badge without color code', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          mapCatalogProvider.overrideWith(
+            _TestMapCatalogControllerWithDefault.new,
+          ),
+        ],
+        child: MaterialApp(
+          locale: const Locale('vi'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: LayerCatalogSheet()),
+        ),
+      ),
+    );
+
+    final boundaryCategory = find.text('Ranh Gioi');
+    await tester.tap(boundaryCategory);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Mặc định'), findsOneWidget);
+    expect(find.text('#FF0055'), findsNothing);
+  });
+}
+
+class _TestMapCatalogControllerWithDefault extends MapCatalogController {
+  @override
+  MapCatalogState build() => const MapCatalogState(
+    layers: [
+      LayerModel(
+        id: 'boundary',
+        code: 'ranh_gioi',
+        nameVi: 'Ranh giới',
+        category: 'ranh_gioi',
+        geometryType: 'LINESTRING',
+        storageKind: 'postgis',
+        srid: 3857,
+        isPublic: true,
+        isEnableDefault: true,
+        defaultStyle: {'strokeColor': '#FF0055'},
+        legend: {},
+      ),
+    ],
+  );
 }
 
 class _TestMapCatalogController extends MapCatalogController {

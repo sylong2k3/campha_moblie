@@ -95,10 +95,12 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     expect(router.state.uri.path, RoutePaths.notifications);
-    router.push(RoutePaths.reportDetail('28'));
+    // Màn Thông báo push route con /notifications/report/:id (ngoài shell) —
+    // push /reports/:id ở đây sẽ dựng lại page shell và trùng key Navigator.
+    router.push(RoutePaths.notificationReportDetail('28'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
-    expect(router.state.uri.path, '/reports/28');
+    expect(router.state.uri.path, '/notifications/report/28');
   });
 }
 

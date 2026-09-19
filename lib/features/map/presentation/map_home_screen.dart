@@ -13,6 +13,7 @@ import '../../../core/error/app_exception.dart';
 import '../../../core/error/error_l10n.dart';
 import '../../../core/l10n/l10n.dart';
 import '../../../core/location/location_helper.dart';
+import '../../../core/location/map_defaults.dart';
 import '../../../core/network/api_config.dart';
 import '../../../core/storage/token_storage.dart';
 import '../../auth/domain/session_controller.dart';
@@ -67,6 +68,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
   ThematicOverlayRenderer? _thematicRenderer;
   bool _styleReady = false;
   bool _mapAuthReady = false;
+  int _styleRevision = 0;
   bool _loaded = false;
   bool _fieldOverlaySyncing = false;
   bool _navigatingToFeature = false;
@@ -81,14 +83,11 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
   bool _needsSyncMap = false;
   FieldToolMode _activeToolPanel = FieldToolMode.idle;
   bool _showLegendCard = true;
-  static final _cameraBounds = CameraBoundsOptions(
-    minZoom: 0,
-    maxZoom: 20.0,
-  );
+  static final _cameraBounds = CameraBoundsOptions(minZoom: 0, maxZoom: 20.0);
 
   final ViewportState _initialViewport = CameraViewportState(
-    center: Point(coordinates: Position(107.32, 21.07)),
-    zoom: 9.6,
+    center: MapDefaults.center,
+    zoom: MapDefaults.defaultZoom,
   );
   final Set<String> _renderedLayerIds = {};
   late final TokenStorage _tokenStorage;
@@ -170,8 +169,23 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     _thematicRenderer?.dispose();
     unawaited(_stopRoutePositionTracking());
     _tokenStorage.removeTokenChangeListener(_applyMapAuth);
-    _map?.removeInteraction(_fieldTapInteractionId);
-    _map?.httpService.setCustomHeadersForHost(_apiHost, {});
+    final map = _map;
+    _map = null;
+    _styleReady = false;
+    _mapAuthReady = false;
+    _styleRevision++;
+    _needsSyncCatalog = false;
+    _needsSyncMap = false;
+    map?.removeInteraction(_fieldTapInteractionId);
+    if (map != null) {
+      unawaited(
+        map.httpService.setCustomHeadersForHost(_apiHost, {}).catchError((
+          Object error,
+        ) {
+          debugPrint('[MAP] clear_headers_failed: $error');
+        }),
+      );
+    }
     super.dispose();
   }
 
@@ -179,13 +193,17 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
   /// tile-ticket mới, để tránh tile bắt đầu 401 khi vé cũ hết hạn.
   Future<void> _refreshPrivateRasterLayers() async {
     final map = _map;
-    if (map == null || !_styleReady || !_mapAuthReady) return;
+    final revision = _styleRevision;
+    if (map == null || !_isCurrentStyle(map, revision) || !_mapAuthReady) {
+      return;
+    }
     final catalog = ref.read(mapCatalogProvider);
     for (final layer in catalog.layers) {
+      if (!_isCurrentStyle(map, revision) || !_mapAuthReady) return;
       if (!layer.isRaster || layer.isPublic) continue;
       if (!_renderedLayerIds.contains(layer.id)) continue;
       await _removeLayer(map, layer.id);
-      if (!mounted || !identical(_map, map)) return;
+      if (!_isCurrentStyle(map, revision)) return;
       await _addLayer(map, layer, catalog.opacityOf(layer.id));
     }
   }
@@ -217,48 +235,55 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
       return;
     }
     try {
-      _routeServiceSubscription = geo.Geolocator.getServiceStatusStream().listen(
-        (status) {
-          if (status == geo.ServiceStatus.disabled) {
-            unawaited(
-              _handleRouteTrackingError(
-                LocationFailure.serviceDisabled,
-                revision,
-              ),
-            );
-          }
-        },
-        onError: (Object error) =>
-            unawaited(_handleRouteTrackingError(error, revision)),
-      );
-      _routePositionSubscription = geo.Geolocator.getPositionStream(
-        locationSettings: const geo.LocationSettings(
-          accuracy: geo.LocationAccuracy.bestForNavigation,
-          distanceFilter: 5,
-        ),
-      ).listen(
-        (position) {
-          if (!_isCurrentRouteTracking(revision) ||
-              !isRecentAccuratePosition(position)) {
-            return;
-          }
-          try {
-            ref.read(fieldToolsProvider.notifier).updateRoutePosition(
-              position: GeoCoordinate(position.longitude, position.latitude),
-              accuracyMeters: position.accuracy,
-              timestamp: position.timestamp,
-            );
-            if (!_hasActiveRoute) unawaited(_stopRoutePositionTracking());
-          } catch (error) {
-            unawaited(_handleRouteTrackingError(error, revision));
-          }
-        },
-        onError: (Object error) =>
-            unawaited(_handleRouteTrackingError(error, revision)),
-        onDone: () => unawaited(
-          _handleRouteTrackingError(LocationFailure.unavailable, revision),
-        ),
-      );
+      _routeServiceSubscription = geo.Geolocator.getServiceStatusStream()
+          .listen(
+            (status) {
+              if (status == geo.ServiceStatus.disabled) {
+                unawaited(
+                  _handleRouteTrackingError(
+                    LocationFailure.serviceDisabled,
+                    revision,
+                  ),
+                );
+              }
+            },
+            onError: (Object error) =>
+                unawaited(_handleRouteTrackingError(error, revision)),
+          );
+      _routePositionSubscription =
+          geo.Geolocator.getPositionStream(
+            locationSettings: const geo.LocationSettings(
+              accuracy: geo.LocationAccuracy.bestForNavigation,
+              distanceFilter: 5,
+            ),
+          ).listen(
+            (position) {
+              if (!_isCurrentRouteTracking(revision) ||
+                  !isRecentAccuratePosition(position)) {
+                return;
+              }
+              try {
+                ref
+                    .read(fieldToolsProvider.notifier)
+                    .updateRoutePosition(
+                      position: GeoCoordinate(
+                        position.longitude,
+                        position.latitude,
+                      ),
+                      accuracyMeters: position.accuracy,
+                      timestamp: position.timestamp,
+                    );
+                if (!_hasActiveRoute) unawaited(_stopRoutePositionTracking());
+              } catch (error) {
+                unawaited(_handleRouteTrackingError(error, revision));
+              }
+            },
+            onError: (Object error) =>
+                unawaited(_handleRouteTrackingError(error, revision)),
+            onDone: () => unawaited(
+              _handleRouteTrackingError(LocationFailure.unavailable, revision),
+            ),
+          );
     } catch (error) {
       await _handleRouteTrackingError(error, revision);
     }
@@ -273,11 +298,11 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     final failure = error is LocationFailure
         ? error
         : error is geo.LocationServiceDisabledException
-            ? LocationFailure.serviceDisabled
-            : await checkLocationAccess() ??
-                (error is geo.PermissionDeniedException
-                    ? LocationFailure.permissionDenied
-                    : LocationFailure.unavailable);
+        ? LocationFailure.serviceDisabled
+        : await checkLocationAccess() ??
+              (error is geo.PermissionDeniedException
+                  ? LocationFailure.permissionDenied
+                  : LocationFailure.unavailable);
     if (!_isCurrentRouteTracking(stoppedRevision)) return;
     debugPrint('[LOCATE] route_tracking_stopped: $error');
     unawaited(_showLocationFailure(failure));
@@ -304,11 +329,17 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
   }
 
   Future<void> _onMapCreated(MapboxMap map) async {
+    if (!mounted) return;
     _map = map;
+    _styleReady = false;
+    _styleRevision++;
+    _renderedLayerIds.clear();
     _thematicRenderer?.dispose();
     _thematicRenderer = ThematicOverlayRenderer(
-      map: map, repository: ref.read(mapRepositoryProvider),
-      isAuthenticated: () => mounted && ref.read(sessionControllerProvider).isAuthenticated,
+      map: map,
+      repository: ref.read(mapRepositoryProvider),
+      isAuthenticated: () =>
+          mounted && ref.read(sessionControllerProvider).isAuthenticated,
       onError: _onThematicError,
     );
     _syncThematicOverlays();
@@ -316,48 +347,84 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     _currentStyleUri = ApiConfig.mapboxStyleStreet.isEmpty
         ? MapboxStyles.STANDARD
         : ApiConfig.mapboxStyleStreet;
-    await map.setCamera(
-      CameraOptions(
-        center: Point(coordinates: Position(107.32, 21.07)),
-        zoom: 9.6,
-      ),
-    );
-    await map.setBounds(_cameraBounds);
-    await _applyMapAuth();
-    await map.compass.updateSettings(CompassSettings(enabled: false));
-    await map.scaleBar.updateSettings(ScaleBarSettings(enabled: false));
+    try {
+      await map.setCamera(
+        CameraOptions(
+          center: MapDefaults.center,
+          zoom: MapDefaults.defaultZoom,
+        ),
+      );
+      if (!mounted || !identical(_map, map)) return;
+      await map.setBounds(_cameraBounds);
+      if (!mounted || !identical(_map, map)) return;
+      await _applyMapAuth();
+      if (!mounted || !identical(_map, map)) return;
+      await map.compass.updateSettings(CompassSettings(enabled: false));
+      if (!mounted || !identical(_map, map)) return;
+      await map.scaleBar.updateSettings(ScaleBarSettings(enabled: false));
+    } catch (error) {
+      _reportMapError(map, 'create', error);
+    }
   }
 
   Future<void> _applyMapAuth() async {
     final map = _map;
-    if (map == null) return;
+    if (!mounted || map == null) return;
     _mapAuthReady = false;
-    final token = await _tokenStorage.readAccessToken();
-    if (!mounted || !identical(_map, map)) return;
-    await map.httpService.setCustomHeadersForHost(
-      _apiHost,
-      token == null || token.isEmpty ? {} : {'Authorization': 'Bearer $token'},
-    );
-    if (mounted && identical(_map, map)) _mapAuthReady = true;
+    try {
+      final token = await _tokenStorage.readAccessToken();
+      if (!mounted || !identical(_map, map)) return;
+      await map.httpService.setCustomHeadersForHost(
+        _apiHost,
+        token == null || token.isEmpty
+            ? {}
+            : {'Authorization': 'Bearer $token'},
+      );
+      if (mounted && identical(_map, map)) _mapAuthReady = true;
+    } catch (error) {
+      _reportMapError(map, 'auth', error);
+    }
   }
 
   Future<void> _onStyleLoaded(StyleLoadedEventData _) async {
+    final map = _map;
+    if (!mounted || map == null) return;
+    final revision = ++_styleRevision;
     _styleReady = true;
     _renderedLayerIds.clear();
-    if (mounted) {
-      setState(() => _error = null);
+    setState(() => _error = null);
+    try {
+      await map.setBounds(_cameraBounds);
+      if (!_isCurrentStyle(map, revision)) return;
+      await _applyMapLanguage();
+      if (!_isCurrentStyle(map, revision)) return;
+      await _applyMapAuth();
+      if (!_isCurrentStyle(map, revision) || !_mapAuthReady) return;
+      final catalog = ref.read(mapCatalogProvider);
+      await _applyBasemap(catalog.selectedBasemap);
+      if (!_isCurrentStyle(map, revision)) return;
+      _installFieldTapInteraction();
+      await _syncMap(catalog);
+      if (!_isCurrentStyle(map, revision)) return;
+      await _syncFieldOverlay(ref.read(fieldToolsProvider));
+      if (!_isCurrentStyle(map, revision)) return;
+      _syncThematicOverlays();
+      _thematicRenderer?.styleLoaded();
+    } catch (error) {
+      _reportMapError(map, 'style_loaded', error);
     }
-    await _map?.setBounds(_cameraBounds);
-    await _applyMapLanguage();
-    await _applyMapAuth();
-    if (!_mapAuthReady) return;
-    final catalog = ref.read(mapCatalogProvider);
-    await _applyBasemap(catalog.selectedBasemap);
-    _installFieldTapInteraction();
-    await _syncMap(catalog);
-    await _syncFieldOverlay(ref.read(fieldToolsProvider));
-    _syncThematicOverlays();
-    _thematicRenderer?.styleLoaded();
+  }
+
+  bool _isCurrentStyle(MapboxMap map, int revision) =>
+      mounted &&
+      identical(_map, map) &&
+      _styleReady &&
+      revision == _styleRevision;
+
+  void _reportMapError(MapboxMap map, String operation, Object error) {
+    if (!mounted || !identical(_map, map)) return;
+    debugPrint('[MAP] ${operation}_failed: $error');
+    setState(() => _error = context.l10n.mapTileError);
   }
 
   /// Đặt nhãn bản đồ nền Mapbox (tên đường, địa danh...) hiển thị tiếng Việt.
@@ -371,17 +438,23 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
 
   Future<void> _applyBasemap(BasemapModel? basemap) async {
     final map = _map;
-    if (map == null || !_styleReady || basemap == null) return;
+    final revision = _styleRevision;
+    if (map == null || !_isCurrentStyle(map, revision) || basemap == null) {
+      return;
+    }
     try {
       await map.style.removeStyleLayer(_basemapLayerId);
+      if (!_isCurrentStyle(map, revision)) return;
       await map.style.removeStyleSource(_basemapSourceId);
     } catch (_) {
       // Style reload or initial state has no raster basemap yet.
     }
+    if (!_isCurrentStyle(map, revision)) return;
     if (basemap.isMapboxStyle) {
       if (_currentStyleUri != basemap.urlTemplate) {
         _currentStyleUri = basemap.urlTemplate;
         _styleReady = false;
+        _styleRevision++;
         _thematicRenderer?.styleChanging();
         await map.loadStyleURI(basemap.urlTemplate);
         await _applyMapLanguage();
@@ -401,6 +474,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
         attribution: basemap.attribution,
       ),
     );
+    if (!_isCurrentStyle(map, revision)) return;
     await map.style.addLayer(
       RasterLayer(id: _basemapLayerId, sourceId: _basemapSourceId),
     );
@@ -410,14 +484,17 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     MapCatalogState? previous,
     MapCatalogState next,
   ) async {
+    final map = _map;
+    final revision = _styleRevision;
+    if (map == null || !_isCurrentStyle(map, revision) || !_mapAuthReady) {
+      return;
+    }
     if (_isSyncingCatalog) {
       _needsSyncCatalog = true;
       return;
     }
     _isSyncingCatalog = true;
     try {
-      final map = _map;
-      if (map == null || !_styleReady || !_mapAuthReady) return;
       final basemapChanged =
           previous?.selectedBasemapCode != next.selectedBasemapCode;
       if (basemapChanged) {
@@ -426,21 +503,24 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
         }
         for (final layerId in _renderedLayerIds.toList(growable: false)) {
           await _removeLayer(map, layerId);
+          if (!_isCurrentStyle(map, revision)) return;
         }
         final basemap = next.selectedBasemap;
         final reloadsStyle =
             basemap?.isMapboxStyle == true &&
             _currentStyleUri != basemap!.urlTemplate;
         await _applyBasemap(basemap);
-        if (reloadsStyle) return;
+        if (reloadsStyle || !_isCurrentStyle(map, revision)) return;
       }
       await _syncMap(next);
+    } catch (error) {
+      _reportMapError(map, 'sync_catalog', error);
     } finally {
       _isSyncingCatalog = false;
       if (_needsSyncCatalog) {
         _needsSyncCatalog = false;
         if (mounted) {
-          _syncCatalog(previous, ref.read(mapCatalogProvider));
+          unawaited(_syncCatalog(previous, ref.read(mapCatalogProvider)));
         }
       }
     }
@@ -453,6 +533,11 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
   /// Chỉ cho một lượt sync chạy tại một thời điểm, lượt đến sau chạy lại
   /// bằng state mới nhất sau khi lượt hiện tại kết thúc.
   Future<void> _syncMap(MapCatalogState state) async {
+    final map = _map;
+    final revision = _styleRevision;
+    if (map == null || !_isCurrentStyle(map, revision) || !_mapAuthReady) {
+      return;
+    }
     if (_isSyncingMap) {
       _needsSyncMap = true;
       return;
@@ -460,7 +545,12 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     _isSyncingMap = true;
     try {
       await _syncMapOnce(state);
-      if (mounted) _syncThematicOverlays();
+      if (_isCurrentStyle(map, revision)) _syncThematicOverlays();
+    } catch (error) {
+      // Native có thể bị hủy giữa hai await dù widget vừa kiểm tra mounted.
+      if (_isCurrentStyle(map, revision)) {
+        _reportMapError(map, 'sync_layers', error);
+      }
     } finally {
       _isSyncingMap = false;
       if (_needsSyncMap) {
@@ -474,14 +564,19 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
 
   Future<void> _syncMapOnce(MapCatalogState state) async {
     final map = _map;
-    if (map == null || !_styleReady || !_mapAuthReady) return;
+    final revision = _styleRevision;
+    if (map == null || !_isCurrentStyle(map, revision) || !_mapAuthReady) {
+      return;
+    }
     var removedAny = false;
     for (final layer in state.layers) {
+      if (!_isCurrentStyle(map, revision) || !_mapAuthReady) return;
       final shouldRender = state.activeLayerIds.contains(layer.id);
       final styleLayerId = layer.isRaster
           ? _rasterStyleLayerId(layer.id)
           : _vectorStyleLayerId(layer.id);
       final rendered = await map.style.styleLayerExists(styleLayerId);
+      if (!_isCurrentStyle(map, revision) || !_mapAuthReady) return;
       if (rendered) {
         _renderedLayerIds.add(layer.id);
       } else {
@@ -494,15 +589,17 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
         if (layer.isRaster) {
           for (final existing in state.layers) {
             if (!existing.isRaster && _renderedLayerIds.contains(existing.id)) {
-              position = LayerPosition(
-                below: _vectorStyleLayerId(existing.id),
-              );
+              position = LayerPosition(below: _vectorStyleLayerId(existing.id));
               break;
             }
           }
         }
-        await _addLayer(map, layer, state.opacityOf(layer.id),
-            position: position);
+        await _addLayer(
+          map,
+          layer,
+          state.opacityOf(layer.id),
+          position: position,
+        );
         if (!layer.isRaster) {
           await Future.delayed(const Duration(milliseconds: 250));
         }
@@ -510,10 +607,10 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
         await _removeLayer(map, layer.id);
         removedAny = true;
       } else if (shouldRender) {
-        await _setOpacity(map, layer, state.opacityOf(layer.id));
+        await _updateLayerStyle(map, layer, state.opacityOf(layer.id));
       }
     }
-    if (removedAny) {
+    if (removedAny && _isCurrentStyle(map, revision)) {
       await _forceRedraw(map);
     }
   }
@@ -526,8 +623,11 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
   /// tree; mô phỏng đúng thao tác "di chuyển bản đồ" bằng một lần set lại
   /// camera ở đúng vị trí hiện tại thì buộc engine tính lại và vẽ lại ngay.
   Future<void> _forceRedraw(MapboxMap map) async {
+    final revision = _styleRevision;
+    if (!_isCurrentStyle(map, revision)) return;
     try {
       final cameraState = await map.getCameraState();
+      if (!_isCurrentStyle(map, revision)) return;
       await map.setCamera(
         CameraOptions(
           center: cameraState.center,
@@ -536,6 +636,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
           pitch: cameraState.pitch,
         ),
       );
+      if (!_isCurrentStyle(map, revision)) return;
       await map.triggerRepaint();
     } catch (_) {
       // Best-effort; nếu map chưa sẵn sàng thì bỏ qua, lần sync sau sẽ thử lại.
@@ -548,6 +649,8 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     double opacity, {
     LayerPosition? position,
   }) async {
+    final revision = _styleRevision;
+    if (!_isCurrentStyle(map, revision)) return;
     final renderError = context.l10n.mapLayerRenderError(layer.nameVi);
     try {
       if (layer.isRaster) {
@@ -558,18 +661,22 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
         final repository = ref.read(mapRepositoryProvider);
         // Layer raster private cần vé tile-ticket lấy qua API yêu cầu JWT.
         // Khách (guest) không có JWT → bỏ qua yên lặng, không báo lỗi.
-        final isAuthenticated =
-            ref.read(sessionControllerProvider).isAuthenticated;
+        final isAuthenticated = ref
+            .read(sessionControllerProvider)
+            .isAuthenticated;
         if (!layer.isPublic && !isAuthenticated) return;
         final ticket = layer.isPublic
             ? null
             : await repository.validRasterTileTicket(layer.id);
+        if (!_isCurrentStyle(map, revision) || !_mapAuthReady) return;
         final sourceId = _rasterSourceId(layer.id);
         final styleLayerId = _rasterStyleLayerId(layer.id);
         try {
           await map.style.removeStyleLayer(styleLayerId);
+          if (!_isCurrentStyle(map, revision)) return;
           await map.style.removeStyleSource(sourceId);
         } catch (_) {}
+        if (!_isCurrentStyle(map, revision)) return;
         await map.style.addSource(
           RasterSource(
             id: sourceId,
@@ -583,6 +690,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
             volatile: true,
           ),
         );
+        if (!_isCurrentStyle(map, revision)) return;
         if (position != null) {
           try {
             await map.style.addLayerAt(
@@ -595,6 +703,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
             );
           } catch (_) {
             // Fallback: layer "below" co the da bi xoa (basemap reload, etc.)
+            if (!_isCurrentStyle(map, revision)) return;
             await map.style.addLayer(
               RasterLayer(
                 id: styleLayerId,
@@ -612,6 +721,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
             ),
           );
         }
+        if (!_isCurrentStyle(map, revision)) return;
         await map.style.setStyleLayerProperty(
           styleLayerId,
           'raster-opacity',
@@ -620,12 +730,13 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
       } else {
         final sourceId = _vectorSourceId(layer.id);
         final styleLayerId = _vectorStyleLayerId(layer.id);
-        final color = layer.displayColor.toARGB32();
         try {
           map.removeInteraction('identify-${layer.id}');
           await map.style.removeStyleLayer(styleLayerId);
+          if (!_isCurrentStyle(map, revision)) return;
           await map.style.removeStyleSource(sourceId);
         } catch (_) {}
+        if (!_isCurrentStyle(map, revision)) return;
         await map.style.addSource(
           VectorSource(
             id: sourceId,
@@ -636,44 +747,9 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
             volatile: true,
           ),
         );
-        if (layer.isPoint) {
-          await map.style.addLayer(
-            CircleLayer(
-              id: styleLayerId,
-              sourceId: sourceId,
-              sourceLayer: layer.code,
-              circleColor: color,
-              circleRadius: 5.5,
-              circleOpacity: opacity,
-              circleStrokeColor: Colors.white.toARGB32(),
-              circleStrokeWidth: 1.5,
-            ),
-          );
-        } else if (layer.isPolygon) {
-          await map.style.addLayer(
-            FillLayer(
-              id: styleLayerId,
-              sourceId: sourceId,
-              sourceLayer: layer.code,
-              fillColor: color,
-              fillOpacity: opacity * 0.32,
-              fillOutlineColor: color,
-            ),
-          );
-        } else {
-          await map.style.addLayer(
-            LineLayer(
-              id: styleLayerId,
-              sourceId: sourceId,
-              sourceLayer: layer.code,
-              lineColor: color,
-              lineWidth: 3,
-              lineOpacity: opacity,
-              lineCap: LineCap.ROUND,
-              lineJoin: LineJoin.ROUND,
-            ),
-          );
-        }
+        if (!_isCurrentStyle(map, revision)) return;
+        await map.style.addLayer(_vectorLayer(layer, opacity));
+        if (!_isCurrentStyle(map, revision)) return;
         map.addInteraction(
           TapInteraction(FeaturesetDescriptor(layerId: styleLayerId), (
             feature,
@@ -716,63 +792,108 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
                 mounted &&
                 !_navigatingToFeature) {
               _navigatingToFeature = true;
-              context
-                  .push('/map/feature/${layer.id}/$featureId')
-                  .whenComplete(() {
-                    if (mounted) _navigatingToFeature = false;
-                  });
+              context.push('/map/feature/${layer.id}/$featureId').whenComplete(
+                () {
+                  if (mounted) _navigatingToFeature = false;
+                },
+              );
             }
           }),
           interactionID: 'identify-${layer.id}',
         );
       }
+      if (!_isCurrentStyle(map, revision)) return;
       _renderedLayerIds.add(layer.id);
-      if (mounted) {
-        setState(() => _error = null);
-      }
+      setState(() => _error = null);
     } catch (error) {
-      if (mounted) {
+      if (_isCurrentStyle(map, revision)) {
         setState(() => _error = renderError);
       }
     }
   }
 
   Future<void> _removeLayer(MapboxMap map, String layerId) async {
+    final revision = _styleRevision;
+    if (!_isCurrentStyle(map, revision)) return;
     map.removeInteraction('identify-$layerId');
     for (final (styleLayerId, sourceId) in [
       (_vectorStyleLayerId(layerId), _vectorSourceId(layerId)),
       (_rasterStyleLayerId(layerId), _rasterSourceId(layerId)),
     ]) {
+      if (!_isCurrentStyle(map, revision)) return;
       try {
         await map.style.removeStyleLayer(styleLayerId);
+        if (!_isCurrentStyle(map, revision)) return;
         await map.style.removeStyleSource(sourceId);
       } catch (_) {
         // Style reload can remove resources first; desired state is already absent.
       }
     }
-    _renderedLayerIds.remove(layerId);
+    if (_isCurrentStyle(map, revision)) _renderedLayerIds.remove(layerId);
   }
 
-  Future<void> _setOpacity(
+  Layer _vectorLayer(LayerModel layer, double opacity) {
+    final id = _vectorStyleLayerId(layer.id);
+    final sourceId = _vectorSourceId(layer.id);
+    if (layer.isPoint) {
+      return CircleLayer(
+        id: id,
+        sourceId: sourceId,
+        sourceLayer: layer.code,
+        circleColor: (layer.customPointColor ?? layer.displayColor).toARGB32(),
+        circleRadius: layer.customCircleRadius ?? 5.5,
+        circleOpacity: (layer.customCircleOpacity ?? 1.0) * opacity,
+        circleStrokeColor: (layer.customCircleStrokeColor ?? Colors.white)
+            .toARGB32(),
+        circleStrokeWidth: layer.customCircleStrokeWidth ?? 1.5,
+      );
+    }
+    if (layer.isPolygon) {
+      return FillLayer(
+        id: id,
+        sourceId: sourceId,
+        sourceLayer: layer.code,
+        fillColor: (layer.customFillColor ?? layer.displayColor).toARGB32(),
+        fillOpacity: (layer.customFillOpacity ?? 0.32) * opacity,
+        fillOutlineColor: (layer.customStrokeColor ?? layer.displayColor)
+            .toARGB32(),
+      );
+    }
+    return LineLayer(
+      id: id,
+      sourceId: sourceId,
+      sourceLayer: layer.code,
+      lineColor: (layer.customStrokeColor ?? layer.displayColor).toARGB32(),
+      lineWidth: layer.customStrokeWidth ?? 3.0,
+      lineOpacity: (layer.customStrokeOpacity ?? 1.0) * opacity,
+      lineCap: LineCap.ROUND,
+      lineJoin: LineJoin.ROUND,
+    );
+  }
+
+  Future<void> _updateLayerStyle(
     MapboxMap map,
     LayerModel layer,
-    double value,
+    double opacity,
   ) async {
-    final id = layer.isRaster
-        ? _rasterStyleLayerId(layer.id)
-        : _vectorStyleLayerId(layer.id);
+    final revision = _styleRevision;
+    if (!_isCurrentStyle(map, revision)) return;
     try {
       if (layer.isRaster) {
-        await map.style.setStyleLayerProperty(id, 'raster-opacity', value);
-      } else if (layer.isPoint) {
-        await map.style.setStyleLayerProperty(id, 'circle-opacity', value);
-      } else if (layer.isPolygon) {
-        await map.style.setStyleLayerProperty(id, 'fill-opacity', value * 0.32);
+        await map.style.setStyleLayerProperty(
+          _rasterStyleLayerId(layer.id),
+          'raster-opacity',
+          opacity,
+        );
       } else {
-        await map.style.setStyleLayerProperty(id, 'line-opacity', value);
+        await map.style.updateLayer(_vectorLayer(layer, opacity));
       }
-    } catch (_) {
-      // Layer may be between style reload frames; next catalog update re-adds it.
+    } catch (error) {
+      // Có thể gặp style reload; không để lỗi cập nhật màu bị nuốt im lặng.
+      if (_isCurrentStyle(map, revision)) {
+        debugPrint('[MAP] update_layer_style_failed (${layer.id}): $error');
+        setState(() => _error = context.l10n.mapLayerRenderError(layer.nameVi));
+      }
     }
   }
 
@@ -1133,10 +1254,18 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     final layers = <ThematicRaster>[];
     if (forest.isVisible && forest.snapshot != null) {
       try {
-        final url = ref.read(mapRepositoryProvider).forestTileUrl(forest.snapshot!);
+        final url = ref
+            .read(mapRepositoryProvider)
+            .forestTileUrl(forest.snapshot!);
         if (url != null) {
-          layers.add(ThematicRaster(sourceId: 'forest-classification',
-          name: 'Phân loại đối tượng', tileUrl: url, opacity: forest.opacity));
+          layers.add(
+            ThematicRaster(
+              sourceId: 'forest-classification',
+              name: 'Phân loại đối tượng',
+              tileUrl: url,
+              opacity: forest.opacity,
+            ),
+          );
         }
       } catch (_) {
         setState(() => _error = 'Nguồn bản đồ phân loại không hợp lệ');
@@ -1144,41 +1273,76 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     }
     if (scenario != null && scenario.canSelect) {
       final layer = scenario.layer!;
-      layers.add(ThematicRaster(sourceId: 'flood-scenario-${scenario.id}',
-        name: scenario.nameVi, registryLayerId: layer.id, isPublic: layer.isPublic,
-        minZoom: layer.minZoom ?? 0, maxZoom: layer.maxZoom ?? 22));
+      layers.add(
+        ThematicRaster(
+          sourceId: 'flood-scenario-${scenario.id}',
+          name: scenario.nameVi,
+          registryLayerId: layer.id,
+          isPublic: layer.isPublic,
+          minZoom: layer.minZoom ?? 0,
+          maxZoom: layer.maxZoom ?? 22,
+        ),
+      );
     }
     for (final artifact in hydrology.currentArtifacts) {
-      if (hydrology.visibleIds.contains(artifact.id) && artifact.registryLayerId != null) {
-        layers.add(ThematicRaster(sourceId: 'flood-artifact-${artifact.id}',
-          name: artifact.labelVi, registryLayerId: artifact.registryLayerId, isPublic: artifact.isPublic));
+      if (hydrology.visibleIds.contains(artifact.id) &&
+          artifact.registryLayerId != null) {
+        layers.add(
+          ThematicRaster(
+            sourceId: 'flood-artifact-${artifact.id}',
+            name: artifact.labelVi,
+            registryLayerId: artifact.registryLayerId,
+            isPublic: artifact.isPublic,
+          ),
+        );
       }
     }
-    final vector = ref.read(mapCatalogProvider).layers.where(
-      (l) => !l.isRaster && _renderedLayerIds.contains(l.id)).firstOrNull;
-    _thematicRenderer!.update(layers, belowLayerId: vector == null ? null : _vectorStyleLayerId(vector.id));
+    final vector = ref
+        .read(mapCatalogProvider)
+        .layers
+        .where((l) => !l.isRaster && _renderedLayerIds.contains(l.id))
+        .firstOrNull;
+    _thematicRenderer!.update(
+      layers,
+      belowLayerId: vector == null ? null : _vectorStyleLayerId(vector.id),
+    );
   }
 
   void _onThematicError(ThematicRaster layer, Object error) {
     if (!mounted) return;
-    setState(() => _error = '${layer.name}: ${error.localizedErrorMessage(context.l10n)}');
-    if (error is UnauthorizedException || error is ForbiddenException || error is NotFoundException) {
+    setState(
+      () => _error =
+          '${layer.name}: ${error.localizedErrorMessage(context.l10n)}',
+    );
+    if (error is UnauthorizedException ||
+        error is ForbiddenException ||
+        error is NotFoundException) {
       if (layer.sourceId.startsWith('flood-scenario-')) {
         ref.read(floodScenarioProvider.notifier).deactivate();
       } else if (layer.sourceId.startsWith('flood-artifact-')) {
-        final id = int.tryParse(layer.sourceId.replaceFirst('flood-artifact-', ''));
-        if (id != null) ref.read(floodHydrologyProvider.notifier).hideArtifact(id);
+        final id = int.tryParse(
+          layer.sourceId.replaceFirst('flood-artifact-', ''),
+        );
+        if (id != null) {
+          ref.read(floodHydrologyProvider.notifier).hideArtifact(id);
+        }
       }
     }
   }
 
   Future<void> _openFloodHydrology() => showModalBottomSheet<void>(
-    context: context, isScrollControlled: true, useSafeArea: true,
-    builder: (_) => const FloodHydrologySheet());
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (_) => const FloodHydrologySheet(),
+  );
 
   Future<void> _openForestClassification() => showModalBottomSheet<void>(
-    context: context, isScrollControlled: true, useSafeArea: true,
-    builder: (_) => const ForestClassificationSheet());
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (_) => const ForestClassificationSheet(),
+  );
 
   Future<void> _openCatalog() async {
     await showModalBottomSheet<void>(
@@ -1227,10 +1391,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
       coordinates: Position(result.longitude, result.latitude),
     );
     await _map?.flyTo(
-      CameraOptions(
-        center: targetPoint,
-        zoom: 16.5,
-      ),
+      CameraOptions(center: targetPoint, zoom: 16.5),
       MapAnimationOptions(duration: 900),
     );
   }
@@ -1265,8 +1426,16 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
         'Kịch bản ngập úng',
         _openFloodScenarios,
       ),
-      _ToolItem(Icons.flood_outlined, 'Ngập lụt & Thủy văn', _openFloodHydrology),
-      _ToolItem(Icons.forest_outlined, 'Phân loại đối tượng', _openForestClassification),
+      _ToolItem(
+        Icons.flood_outlined,
+        'Ngập lụt & Thủy văn',
+        _openFloodHydrology,
+      ),
+      _ToolItem(
+        Icons.forest_outlined,
+        'Phân loại đối tượng',
+        _openForestClassification,
+      ),
       _ToolItem(
         Icons.location_searching_rounded,
         context.l10n.locationWeatherTitle,
@@ -1341,8 +1510,8 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
   Future<void> _recenter() =>
       _map?.flyTo(
         CameraOptions(
-          center: Point(coordinates: Position(107.32, 21.07)),
-          zoom: 9.6,
+          center: MapDefaults.center,
+          zoom: MapDefaults.defaultZoom,
         ),
         MapAnimationOptions(duration: AppMotion.camera(context, far: true)),
       ) ??
@@ -1363,18 +1532,17 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
       final pos = result.position!;
       final coord = GeoCoordinate(pos.longitude, pos.latitude);
 
-      ref.read(fieldToolsProvider.notifier).setGpsLocation(
-        coordinate: coord,
-        accuracyMeters: pos.accuracy,
-        timestamp: pos.timestamp,
-      );
+      ref
+          .read(fieldToolsProvider.notifier)
+          .setGpsLocation(
+            coordinate: coord,
+            accuracyMeters: pos.accuracy,
+            timestamp: pos.timestamp,
+          );
 
       try {
         await _map?.location.updateSettings(
-          LocationComponentSettings(
-            enabled: true,
-            pulsingEnabled: true,
-          ),
+          LocationComponentSettings(enabled: true, pulsingEnabled: true),
         );
       } catch (_) {}
 
@@ -1394,9 +1562,9 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     } catch (error) {
       debugPrint('[LOCATE] center_map_failed: $error');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.errorUnknown)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(context.l10n.errorUnknown)));
       }
     } finally {
       _locatingUser = false;
@@ -1468,9 +1636,9 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
       _openedGpsSettings = false;
       debugPrint('[LOCATE] open_settings_failed: $error');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.errorUnknown)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(context.l10n.errorUnknown)));
       }
     } finally {
       _gpsRecoveryVisible = false;
@@ -1510,10 +1678,31 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     final toolActive = _activeToolPanel != FieldToolMode.idle;
     ref.listen<MapCatalogState>(mapCatalogProvider, (previous, next) {
       unawaited(_syncCatalog(previous, next));
+      if (previous != null && next.activeCount > previous.activeCount) {
+        if (mounted) setState(() => _showLegendCard = true);
+      }
     });
-    ref.listen(floodScenarioProvider, (_, _) => _syncThematicOverlays());
-    ref.listen(floodHydrologyProvider, (_, _) => _syncThematicOverlays());
-    ref.listen(forestClassificationProvider, (_, _) => _syncThematicOverlays());
+    ref.listen(floodScenarioProvider, (prev, next) {
+      _syncThematicOverlays();
+      if (prev?.selectedScenarioId != next.selectedScenarioId &&
+          next.selectedScenarioId != null) {
+        if (mounted) setState(() => _showLegendCard = true);
+      }
+    });
+    ref.listen(floodHydrologyProvider, (prev, next) {
+      _syncThematicOverlays();
+      final prevCount = prev?.visibleIds.length ?? 0;
+      final nextCount = next.visibleIds.length;
+      if (nextCount > prevCount) {
+        if (mounted) setState(() => _showLegendCard = true);
+      }
+    });
+    ref.listen(forestClassificationProvider, (prev, next) {
+      _syncThematicOverlays();
+      if (prev?.isVisible != next.isVisible && next.isVisible) {
+        if (mounted) setState(() => _showLegendCard = true);
+      }
+    });
     ref.listen<FieldToolsState>(fieldToolsProvider, (_, next) {
       _queueFieldOverlay(next);
     });
@@ -1521,34 +1710,9 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     final activeLayers = catalog.layers
         .where((l) => catalog.activeLayerIds.contains(l.id))
         .toList();
-    final activeFloodLayer = activeLayers
-        .where(isFloodLandCoverLayer)
-        .firstOrNull;
-    final hasFloodLandCover = activeFloodLayer != null;
-    final floodLegendItems = activeFloodLayer == null
-        ? const <LegendColorItem>[]
-        : ref
-              .watch(mapLegendProvider(activeFloodLayer.id))
-              .maybeWhen(
-                data: (data) => getLegendItems(data, activeFloodLayer),
-                orElse: () => const <LegendColorItem>[],
-              );
-    final activeVectorLayers = activeLayers
-        .where((l) => !isFloodLandCoverLayer(l))
-        .toList();
-    final vectorLegendItems = [
-      for (final layer in activeVectorLayers)
-        LegendColorItem(
-          label: layer.nameVi,
-          color: layer.displayColor,
-          geometryType: layer.isPoint
-              ? LegendGeometryType.point
-              : layer.isLine
-                  ? LegendGeometryType.line
-                  : LegendGeometryType.polygon,
-          isPoint: layer.isPoint,
-        ),
-    ];
+    final activeCatalogLegendItems = deduplicateLegendItems(
+      activeLayers.expand(getLegendItemsForLayer),
+    );
 
     // --- Thematic overlay legends ---
     final floodScenarioState = ref.watch(floodScenarioProvider);
@@ -1558,11 +1722,14 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     final thematicLegendItems = <LegendColorItem>[];
     final thematicNames = <String>[];
 
-    // Kịch bản ngập úng
+    // Kịch bản ngập úng: layer đã chứa `legend` từ API kịch bản.
     if (floodScenarioState.selectedScenario case final scenario?
         when scenario.canSelect) {
-      thematicNames.add(scenario.nameVi);
-      thematicLegendItems.addAll(defaultFloodLandCoverLegendItems);
+      final scenarioItems = getLegendItemsForLayer(scenario.layer!);
+      if (scenarioItems.isNotEmpty) {
+        thematicNames.add(scenario.nameVi);
+        thematicLegendItems.addAll(scenarioItems);
+      }
     }
 
     // Ngập lụt & Thủy văn
@@ -1579,53 +1746,53 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
             radix: 16,
           );
           if (colorInt != null) {
-            thematicLegendItems.add(LegendColorItem(
-              label: entry.label,
-              color: Color(colorInt),
-              geometryType: LegendGeometryType.raster,
-            ));
+            thematicLegendItems.add(
+              LegendColorItem(
+                label: entry.label,
+                color: Color(colorInt),
+                geometryType: LegendGeometryType.raster,
+              ),
+            );
           }
         }
-      } else {
-        thematicNames.add(artifact.labelVi);
-        thematicLegendItems.addAll(defaultFloodLandCoverLegendItems);
       }
     }
 
     // Phân loại đối tượng
     if (forestState.isVisible && forestState.snapshot != null) {
       final snap = forestState.snapshot!;
-      thematicNames.add('Phân loại ${snap.periodText}');
+      final forestItems = <LegendColorItem>[];
       for (final cls in snap.legend) {
         final colorInt = int.tryParse(
           'FF${cls.color.replaceAll('#', '')}',
           radix: 16,
         );
         if (colorInt != null) {
-          thematicLegendItems.add(LegendColorItem(
-            label: cls.nameVi,
-            color: Color(colorInt),
-            geometryType: LegendGeometryType.raster,
-          ));
+          forestItems.add(
+            LegendColorItem(
+              label: cls.nameVi,
+              color: Color(colorInt),
+              geometryType: LegendGeometryType.raster,
+            ),
+          );
         }
       }
-      if (snap.legend.isEmpty) {
-        thematicLegendItems.addAll(defaultFloodLandCoverLegendItems);
+      if (forestItems.isNotEmpty) {
+        thematicNames.add('Phân loại ${snap.periodText}');
+        thematicLegendItems.addAll(forestItems);
       }
     }
 
-    final hasMapLegend = hasFloodLandCover ||
-        vectorLegendItems.isNotEmpty ||
-        thematicLegendItems.isNotEmpty;
-    final mapLegendItems = [
-      ...vectorLegendItems,
-      ...floodLegendItems,
+    final hasMapLegend =
+        activeCatalogLegendItems.isNotEmpty || thematicLegendItems.isNotEmpty;
+    final mapLegendItems = deduplicateLegendItems([
+      ...activeCatalogLegendItems,
       ...thematicLegendItems,
-    ];
-    final allLegendNames = [
+    ]);
+    final allLegendNames = <String>{
       ...activeLayers.map((l) => l.nameVi),
       ...thematicNames,
-    ];
+    }.toList(growable: false);
     final mapLegendTitle = allLegendNames.length == 1
         ? allLegendNames.first
         : 'Chú giải lớp bản đồ';
@@ -1635,13 +1802,6 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
         '-f${floodScenarioState.selectedScenarioId ?? 0}'
         '-h${hydrologyState.visibleIds.length}'
         '-c${forestState.isVisible ? (forestState.snapshot?.id ?? 0) : 0}';
-
-    // Tự bật chú giải khi có overlay thematic mới
-    if (thematicLegendItems.isNotEmpty && !_showLegendCard) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _showLegendCard = true);
-      });
-    }
 
     return Scaffold(
       body: Stack(
@@ -1655,12 +1815,11 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
             onMapCreated: _onMapCreated,
             onStyleLoadedListener: _onStyleLoaded,
             onMapLoadedListener: (_) {
-              if (mounted) {
-                setState(() {
-                  _loaded = true;
-                  _error = null;
-                });
-              }
+              if (!mounted || _map == null) return;
+              setState(() {
+                _loaded = true;
+                _error = null;
+              });
               unawaited(_syncMap(ref.read(mapCatalogProvider)));
             },
             onMapLoadErrorListener: (event) {
@@ -1875,9 +2034,9 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .primaryContainer,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.primaryContainer,
                                   shape: BoxShape.circle,
                                 ),
                                 child: Icon(
@@ -1910,9 +2069,9 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
                                           .textTheme
                                           .bodySmall
                                           ?.copyWith(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSurfaceVariant,
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.onSurfaceVariant,
                                           ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,

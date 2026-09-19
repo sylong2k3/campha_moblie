@@ -467,9 +467,55 @@ void _regressions() {
       await tester.pumpAndSettle();
       expect(find.byType(SelectableText), findsOneWidget);
       expect(find.text('Close'), findsOneWidget);
+      await tester.ensureVisible(find.text('Close'));
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
+      expect(find.byType(SelectableText), findsNothing);
+      expect(find.byType(NotificationsScreen), findsOneWidget);
+      expect(repo.items, hasLength(1));
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('closing notification twice keeps inbox route and data', (
+    tester,
+  ) async {
+    final repo = _FakeNotificationRepository(items: [_item(1)]);
+    await tester.pumpWidget(
+      _app(
+        repo,
+        child: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const NotificationsScreen(),
+                ),
+              ),
+              child: const Text('Open inbox'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open inbox'));
+    await tester.pumpAndSettle();
+    for (var i = 0; i < 2; i++) {
+      await tester.tap(find.text('Notification 1'));
+      await tester.pumpAndSettle();
+      expect(find.byType(SelectableText), findsOneWidget);
+      final close = find.widgetWithText(TextButton, 'Đóng');
+      final closePosition = tester.getCenter(close);
+      await tester.tap(close);
+      await tester.tapAt(closePosition);
+      await tester.pumpAndSettle();
+      expect(find.byType(SelectableText), findsNothing);
+      expect(find.byType(NotificationsScreen), findsOneWidget);
+      expect(find.text('Notification 1'), findsOneWidget);
+      expect(repo.items, hasLength(1));
+      expect(tester.takeException(), isNull);
+    }
+  });
 
   testWidgets('badge hides previous count while a new session loads', (
     tester,

@@ -472,7 +472,7 @@ void main() {
     'forest renders 8 classes, default visibility and full opacity range',
     (tester) async {
       await pumpSheet(tester, const ForestClassificationSheet());
-      expect(find.text('CHÚ GIẢI · 8 LỚP'), findsOneWidget);
+      expect(find.text('Chú giải · 8 lớp'), findsOneWidget);
       final slider = tester.widget<Slider>(find.byType(Slider));
       expect(slider.value, 0.85);
       expect(slider.min, 0);

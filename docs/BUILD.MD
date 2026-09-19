@@ -1,0 +1,1 @@
+flutter build apk --flavor prod --release --target-platform android-arm64 --split-per-abi -t lib/main.dart --dart-define-from-file=.env --dart-define=ENABLE_TEST_LOGIN=true

@@ -2,12 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../domain/layer_model.dart';
 
-enum LegendGeometryType {
-  point,
-  line,
-  polygon,
-  raster,
-}
+enum LegendGeometryType { point, line, polygon, raster }
 
 class LegendColorItem {
   const LegendColorItem({
@@ -22,18 +17,15 @@ class LegendColorItem {
   final LegendGeometryType geometryType;
   final bool isPoint;
 
-  bool get isPointGeometry => isPoint || geometryType == LegendGeometryType.point;
+  bool get isPointGeometry =>
+      isPoint || geometryType == LegendGeometryType.point;
   bool get isLineGeometry => geometryType == LegendGeometryType.line;
   bool get isPolygonGeometry => geometryType == LegendGeometryType.polygon;
   bool get isRasterGeometry => geometryType == LegendGeometryType.raster;
 }
 
 class LegendSymbolWidget extends StatelessWidget {
-  const LegendSymbolWidget({
-    super.key,
-    required this.item,
-    this.size = 1.0,
-  });
+  const LegendSymbolWidget({super.key, required this.item, this.size = 1.0});
 
   final LegendColorItem item;
   final double size;
@@ -49,10 +41,7 @@ class LegendSymbolWidget extends StatelessWidget {
         decoration: BoxDecoration(
           color: item.color,
           shape: BoxShape.circle,
-          border: Border.all(
-            color: Colors.white,
-            width: 1.5 * size,
-          ),
+          border: Border.all(color: Colors.white, width: 1.5 * size),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.25),
@@ -85,10 +74,7 @@ class LegendSymbolWidget extends StatelessWidget {
         decoration: BoxDecoration(
           color: item.color.withValues(alpha: 0.35),
           borderRadius: BorderRadius.circular(3.0 * size),
-          border: Border.all(
-            color: item.color,
-            width: 1.6 * size,
-          ),
+          border: Border.all(color: item.color, width: 1.6 * size),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.12),
@@ -114,71 +100,25 @@ class LegendSymbolWidget extends StatelessWidget {
   }
 }
 
-/// Chú giải chuẩn cho lớp phủ ngập / lớp phủ đất
-const List<LegendColorItem> defaultFloodLandCoverLegendItems = [
-  LegendColorItem(
-    label: 'Mặt nước',
-    color: Color(0xFF0080FF),
-    geometryType: LegendGeometryType.raster,
-  ),
-  LegendColorItem(
-    label: 'Rừng LRTX có độ che phủ thưa',
-    color: Color(0xFF004D00),
-    geometryType: LegendGeometryType.raster,
-  ),
-  LegendColorItem(
-    label: 'Dân cư đô thị',
-    color: Color(0xFFFF9999),
-    geometryType: LegendGeometryType.raster,
-  ),
-  LegendColorItem(
-    label: 'Đất trống khô',
-    color: Color(0xFFFFFF99),
-    geometryType: LegendGeometryType.raster,
-  ),
-  LegendColorItem(
-    label: 'Bãi khai thác than',
-    color: Color(0xFF8B5A2B),
-    geometryType: LegendGeometryType.raster,
-  ),
-  LegendColorItem(
-    label: 'Cây bụi',
-    color: Color(0xFF27AE60),
-    geometryType: LegendGeometryType.raster,
-  ),
-  LegendColorItem(
-    label: 'Đất trống trảng cỏ',
-    color: Color(0xFFCCFF00),
-    geometryType: LegendGeometryType.raster,
-  ),
-  LegendColorItem(
-    label: 'Đất nông nghiệp',
-    color: Color(0xFFFFCC99),
-    geometryType: LegendGeometryType.raster,
-  ),
-];
-
-/// Kiểm tra xem một layer có thuộc nhóm lớp phủ ngập / đất không (chỉ áp dụng raster / vùng phủ)
-bool isFloodLandCoverLayer(LayerModel layer) {
-  if (layer.isPoint) return false;
-  final cat = layer.category.toLowerCase();
-  final code = layer.code.toLowerCase();
-  final name = layer.nameVi.toLowerCase();
-  return cat.contains('phu') ||
-      cat.contains('land_cover') ||
-      code.contains('phu') ||
-      code.contains('land_cover') ||
-      name.contains('phủ') ||
-      (layer.isRaster &&
-          (cat.contains('ngap') ||
-              code.contains('ngap') ||
-              name.contains('ngập')));
+/// Giữ thứ tự API nhưng loại mục lặp do cùng layer/source được tổng hợp lại.
+List<LegendColorItem> deduplicateLegendItems(Iterable<LegendColorItem> items) {
+  final unique = <String, LegendColorItem>{};
+  for (final item in items) {
+    final key = [
+      item.label.trim().toLowerCase(),
+      item.color.toARGB32(),
+      item.geometryType.name,
+      item.isPoint,
+    ].join('|');
+    unique.putIfAbsent(key, () => item);
+  }
+  return unique.values.toList(growable: false);
 }
 
-/// Lấy danh sách item chú giải: ưu tiên tuyệt đối dữ liệu `legend` do server
-/// trả về cho đúng layer đang xem; chỉ dùng bộ màu mặc định khi server không
-/// cấu hình chú giải cho layer phủ ngập/đất. Với các lớp vector (point, line,
-/// polygon), trả về ký hiệu và màu sắc nhận diện tương ứng.
+/// Chuyển dữ liệu `legend` từ API thành các mục hiển thị; hỗ trợ định dạng
+/// `entries: [{ label, color }]` và key-value `{ "label": "#color" }`.
+/// Nếu API chưa cấu hình chú giải và có [layer], trả một mục nhận diện bằng
+/// tên lớp và màu đại diện; màu raster thực tế do WMS phía server quyết định.
 List<LegendColorItem> getLegendItems(LayerLegend legend, [LayerModel? layer]) {
   final items = <LegendColorItem>[];
   final geometryType = layer == null
@@ -191,44 +131,89 @@ List<LegendColorItem> getLegendItems(LayerLegend legend, [LayerModel? layer]) {
       ? LegendGeometryType.raster
       : LegendGeometryType.polygon;
 
-  for (final entry in legend.legend.entries) {
-    final key = entry.key;
-    final val = entry.value;
-    if (val is String && val.startsWith('#')) {
-      final hex = val.replaceFirst('#', '');
-      final colorInt = int.tryParse(
-        hex.length == 6 ? 'FF$hex' : hex,
-        radix: 16,
-      );
-      if (colorInt != null) {
-        items.add(
-          LegendColorItem(
-            label: key,
-            color: Color(colorInt),
-            geometryType: geometryType,
-            isPoint: layer?.isPoint ?? false,
-          ),
+  // 1. Kiểm tra cấu hình legend theo chuẩn entries: [ { label, color }, ... ]
+  final rawEntries = legend.legend['entries'];
+  if (rawEntries is List && rawEntries.isNotEmpty) {
+    for (var i = 0; i < rawEntries.length; i++) {
+      final entry = rawEntries[i];
+      if (entry is Map) {
+        final labelRaw = entry['label'] ?? entry['name'] ?? 'Mục ${i + 1}';
+        String label = '';
+        if (labelRaw is Map) {
+          label =
+              labelRaw['vi']?.toString() ??
+              labelRaw['en']?.toString() ??
+              labelRaw['label']?.toString() ??
+              '';
+        } else {
+          label = labelRaw.toString();
+        }
+        final color = parseHexColor(
+          entry['color'] ?? entry['fill'] ?? entry['hex'] ?? entry['colorHex'],
         );
+        if (color != null) {
+          items.add(
+            LegendColorItem(
+              label: label.isEmpty ? 'Mục ${i + 1}' : label,
+              color: color,
+              geometryType: geometryType,
+              isPoint: layer?.isPoint ?? false,
+            ),
+          );
+        }
       }
     }
   }
 
-  if (items.isNotEmpty) return items;
-
-  if (layer != null) {
-    if (isFloodLandCoverLayer(layer)) {
-      return defaultFloodLandCoverLegendItems;
+  // 2. Kiểm tra cấu hình legend dạng key-value map: { "Mặt nước": "#0086FF", ... }
+  if (items.isEmpty) {
+    for (final entry in legend.legend.entries) {
+      if (entry.key == 'entries') continue;
+      final key = entry.key;
+      final val = entry.value;
+      if (val is String && (val.startsWith('#') || val.startsWith('0x'))) {
+        final color = parseHexColor(val);
+        if (color != null) {
+          items.add(
+            LegendColorItem(
+              label: key,
+              color: color,
+              geometryType: geometryType,
+              isPoint: layer?.isPoint ?? false,
+            ),
+          );
+        }
+      }
     }
-    return [
-      LegendColorItem(
-        label: layer.nameVi,
-        color: layer.displayColor,
-        geometryType: geometryType,
-        isPoint: layer.isPoint,
-      ),
-    ];
   }
-  return items;
+
+  if (items.isNotEmpty) return deduplicateLegendItems(items);
+  if (layer == null) return items;
+
+  // API chưa cấu hình `legend`: nhận diện lớp bằng tên và màu đại diện.
+  // Không suy diễn các cấp phân loại hoặc màu pixel của ảnh raster.
+  return [
+    LegendColorItem(
+      label: layer.nameVi,
+      color: layer.displayColor,
+      geometryType: geometryType,
+      isPoint: layer.isPoint,
+    ),
+  ];
+}
+
+/// Lấy danh sách item chú giải trực tiếp từ đối tượng LayerModel.
+List<LegendColorItem> getLegendItemsForLayer(LayerModel layer) {
+  final layerLegend = LayerLegend(
+    layerId: layer.id,
+    code: layer.code,
+    nameVi: layer.nameVi,
+    legend: layer.legend,
+    styleName: layer.styleName,
+    minZoom: layer.minZoom,
+    maxZoom: layer.maxZoom,
+  );
+  return getLegendItems(layerLegend, layer);
 }
 
 class LayerLegendCard extends StatelessWidget {
@@ -249,9 +234,8 @@ class LayerLegendCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displayItems = items.isEmpty
-        ? defaultFloodLandCoverLegendItems
-        : items;
+    if (items.isEmpty) return const SizedBox.shrink();
+    final displayItems = items;
     final columnCount = (displayItems.length / _rowsPerColumn).ceil();
 
     return Container(
@@ -305,16 +289,20 @@ class LayerLegendCard extends StatelessWidget {
                   ),
                 ),
                 if (onClose != null)
-                  InkWell(
-                    onTap: onClose,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Padding(
-                      padding: const EdgeInsets.all(2),
-                      child: Icon(
-                        Icons.close,
-                        size: 18,
-                        color: Theme.of(context).colorScheme.outline,
-                      ),
+                  IconButton(
+                    key: const ValueKey('map-legend-close'),
+                    tooltip: MaterialLocalizations.of(
+                      context,
+                    ).closeButtonTooltip,
+                    constraints: const BoxConstraints(
+                      minWidth: 48,
+                      minHeight: 48,
+                    ),
+                    onPressed: onClose,
+                    icon: Icon(
+                      Icons.close,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.outline,
                     ),
                   ),
               ],
