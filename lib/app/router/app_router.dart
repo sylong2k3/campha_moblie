@@ -1,5 +1,5 @@
 import '../../features/notifications/presentation/notifications_screen.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -73,14 +73,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           path == RoutePaths.reportMine ||
           RegExp(r'^/reports/\d+$').hasMatch(path) ||
           RegExp(r'^/notifications/report/\d+$').hasMatch(path);
-      final protectedNotifications = path == RoutePaths.notifications;
       final protectedFeatureEdit =
           path == RoutePaths.mapFeatureSync ||
           RegExp(
             r'^/map/feature/\d+/[A-Za-z0-9_-]{1,120}/(edit|history)$',
           ).hasMatch(path);
       if (!session.isAuthenticated &&
-          (protectedReport || protectedFeatureEdit || protectedNotifications)) {
+          (protectedReport || protectedFeatureEdit)) {
         return '${RoutePaths.login}?returnTo=${Uri.encodeQueryComponent(state.uri.toString())}';
       }
       if (protectedFeatureEdit &&
@@ -129,8 +128,21 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: RouteNames.forgotPassword,
         builder: (context, state) => const ForgotPasswordScreen(),
       ),
-      StatefulShellRoute.indexedStack(
+      StatefulShellRoute(
         builder: (context, state, shell) => MainShell(navigationShell: shell),
+        navigatorContainerBuilder: (context, navigationShell, children) {
+          final currentIndex = navigationShell.currentIndex;
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              for (var i = 0; i < children.length; i++)
+                Visibility.maintain(
+                  visible: i == currentIndex,
+                  child: children[i],
+                ),
+            ],
+          );
+        },
         branches: [
           StatefulShellBranch(
             routes: [

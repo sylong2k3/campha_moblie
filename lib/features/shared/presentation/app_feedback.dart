@@ -198,19 +198,35 @@ class AppStateMessage extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 56, color: iconColor),
-                const SizedBox(height: 16),
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: iconColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Icon(icon, size: 36, color: iconColor),
+                ),
+                const SizedBox(height: 20),
                 Text(
                   title,
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 if (body case final body?) ...[
-                  const SizedBox(height: 8),
-                  Text(body, textAlign: TextAlign.center),
+                  const SizedBox(height: 10),
+                  Text(
+                    body,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
                 ],
                 if (actionLabel != null && onAction != null) ...[
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 20),
                   FilledButton.icon(
                     onPressed: onAction,
                     icon: const Icon(Icons.refresh),

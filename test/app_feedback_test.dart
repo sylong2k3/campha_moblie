@@ -446,6 +446,27 @@ void main() {
     expect(find.text('Dịch vụ vị trí đang tắt.'), findsNothing);
   });
 
+  testWidgets('login exposes a localized back action', (tester) async {
+    await tester.pumpWidget(
+      const _LocalizedApp(home: LoginScreen(returnTo: '/reports/new')),
+    );
+
+    final back = find.byKey(const ValueKey('login-back'));
+    expect(back, findsOneWidget);
+    expect(
+      find.descendant(of: back, matching: find.text('Quay lại')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: back,
+        matching: find.byIcon(Icons.arrow_back_rounded),
+      ),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('debug login shows horizontal role strip below forgot password', (
     tester,
   ) async {
@@ -478,7 +499,9 @@ void main() {
       expect(find.byKey(ValueKey('test-account-$role')), findsOneWidget);
     }
 
-    await tester.tap(find.byKey(const ValueKey('test-account-citizen')));
+    final citizenAccount = find.byKey(const ValueKey('test-account-citizen'));
+    await tester.ensureVisible(citizenAccount);
+    await tester.tap(citizenAccount);
     await tester.pump();
 
     expect(
@@ -520,7 +543,9 @@ void main() {
     );
     await tester.pump();
 
-    await tester.tap(find.byKey(const ValueKey('test-account-citizen')));
+    final citizenAccount = find.byKey(const ValueKey('test-account-citizen'));
+    await tester.ensureVisible(citizenAccount);
+    await tester.tap(citizenAccount);
     await tester.pump();
 
     expect(repository.loginCalls, 1);

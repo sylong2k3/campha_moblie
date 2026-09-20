@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import '../../firebase_options.dart';
 import '../error/crashlytics_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -81,12 +82,22 @@ class PushService {
 
   static Future<void> _initializeFirebase() async {
     try {
-      await Firebase.initializeApp();
+      FirebaseOptions? options;
+      try {
+        options = DefaultFirebaseOptions.currentPlatform;
+      } catch (_) {
+        // Bỏ qua nếu chạy trên nền tảng chưa cấu hình
+      }
+      await Firebase.initializeApp(options: options);
       _firebaseReady = true;
       await CrashlyticsService.initialize();
-    } catch (_) {
+    } catch (e) {
       _firebaseReady = false;
-      if (kDebugMode) debugPrint('[PUSH] firebase_unavailable');
+      if (kDebugMode) {
+        debugPrint(
+          '[PUSH] firebase_unavailable: $e',
+        );
+      }
     }
   }
 

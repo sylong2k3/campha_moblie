@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/map_repository.dart';
 import 'flood_scenario_model.dart';
+import 'map_controller.dart';
 
 class FloodScenarioState {
   const FloodScenarioState({
@@ -63,13 +64,29 @@ class FloodScenarioController extends Notifier<FloodScenarioState> {
     try {
       final repository = ref.read(mapRepositoryProvider);
       // Chỉ tải các kịch bản ngập đang kích hoạt (activeOnly: true)
-      final list = await repository.getFloodScenarios(activeOnly: true);
-      debugPrint('[FLOOD] scenarios loaded: ${list.length}, canSelect: ${list.where((s) => s.canSelect).length}');
+      final rawList = await repository.getFloodScenarios(activeOnly: true);
+      final catalogLayers = ref.read(mapCatalogProvider).layers;
+      final list = rawList.map((s) {
+        if (s.layer != null) return s;
+        final matched = catalogLayers
+            .where((l) => l.code == s.layerCode)
+            .firstOrNull;
+        return matched != null ? s.copyWith(layer: matched) : s;
+      }).toList();
+
+      debugPrint(
+        '[FLOOD] scenarios loaded: ${list.length}, canSelect: ${list.where((s) => s.canSelect).length}',
+      );
       if (_disposed || generation != _generation) return;
       int? selected = state.selectedScenarioId;
       if (!list.any((s) => s.id == selected && s.canSelect)) selected = null;
       if (!_autoActivated) {
         _autoActivated = true;
+        final candidates = list.where((s) => s.canSelect).toList()
+          ..sort((a, b) => (b.minRainfall ?? 0).compareTo(a.minRainfall ?? 0));
+        selected = candidates.firstOrNull?.id;
+      } else if (selected == null && state.selectedScenarioId != null) {
+        // Kịch bản trước đó người dùng chọn không còn trong danh sách mới -> chọn kịch bản cao nhất
         final candidates = list.where((s) => s.canSelect).toList()
           ..sort((a, b) => (b.minRainfall ?? 0).compareTo(a.minRainfall ?? 0));
         selected = candidates.firstOrNull?.id;

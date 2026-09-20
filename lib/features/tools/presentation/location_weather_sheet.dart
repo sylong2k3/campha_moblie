@@ -227,30 +227,15 @@ class ModernWeatherCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark
-              ? [
-                  colors.surfaceContainerHigh,
-                  colors.surfaceContainer,
-                ]
-              : [
-                  colors.primaryContainer.withValues(alpha: 0.4),
-                  colors.surfaceContainerLowest,
-                ],
-        ),
+        color: colors.surfaceContainerLowest,
         border: Border.all(
-          color: isDark
-              ? colors.outlineVariant.withValues(alpha: 0.6)
-              : colors.primary.withValues(alpha: 0.18),
-          width: 1.2,
+          color: colors.outlineVariant.withValues(alpha: 0.5),
         ),
         boxShadow: [
           BoxShadow(
             color: colors.shadow.withValues(alpha: isDark ? 0.2 : 0.06),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
           ),
         ],
       ),

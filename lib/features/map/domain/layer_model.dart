@@ -1,36 +1,8 @@
 import 'package:flutter/material.dart';
 
-/// Màu mặc định khi server không cấu hình màu riêng cho layer.
-const Color defaultLayerColor = Color(0xFF3B82F6);
+import 'legend_models.dart';
 
-/// Bảng 24 màu phân giải cao, độ tương phản cao để phân biệt rõ ràng giữa các
-/// lớp dữ liệu (point, line, polygon, ranh giới, thủy hệ, công trình...).
-const List<Color> defaultLayerColorPalette = [
-  Color(0xFFE11D48), // Rose Red (Ranh giới, cảnh báo)
-  Color(0xFF0284C7), // Sky Blue (Thủy hệ, sông hồ)
-  Color(0xFF059669), // Emerald Green (Cây xanh, nông nghiệp, sinh thái)
-  Color(0xFFD97706), // Amber (Giao thông, đường bộ)
-  Color(0xFF7C3AED), // Vivid Purple (Quy hoạch, hành chính)
-  Color(0xFFEA580C), // Deep Orange (Công trình, xây dựng)
-  Color(0xFF0891B2), // Deep Cyan (Thoát nước, thủy văn)
-  Color(0xFFDB2777), // Magenta Pink (Điểm cơ sở, y tế, giáo dục)
-  Color(0xFF0D9488), // Teal (Tài nguyên, môi trường)
-  Color(0xFF65A30D), // Lime (Công viên, mặt bằng xanh)
-  Color(0xFF4F46E5), // Indigo (Dịch vụ công, tiện ích)
-  Color(0xFF9A3412), // Rust Brown (Khai khoáng, bãi than, địa chất)
-  Color(0xFF334155), // Slate (Lưới điện, hạ tầng kỹ thuật)
-  Color(0xFFC026D3), // Fuchsia (Địa chính, khu vực đặc thù)
-  Color(0xFF2563EB), // Royal Blue (Vùng ngập, mặt nước biển)
-  Color(0xFF854D0E), // Bronze (Khu công nghiệp)
-  Color(0xFFF43F5E), // Coral (Khu vực nguy cơ cao)
-  Color(0xFF6B21A8), // Deep Violet (Ranh giới bảo tồn)
-  Color(0xFF16A34A), // Forest Green (Rừng phòng hộ)
-  Color(0xFFB45309), // Amber Brown (Kho bãi, đất trống)
-  Color(0xFF0E7490), // Ocean Blue (Hệ thống cấp nước)
-  Color(0xFFBE185D), // Dark Ruby (Điểm nóng môi trường)
-  Color(0xFF4338CA), // Dark Indigo (Công trình ngầm)
-  Color(0xFF15803D), // Deep Green (Đất canh tác nông nghiệp)
-];
+export 'legend_models.dart';
 
 /// Chuyển đổi mã màu hex (#RRGGBB, #AARRGGBB, #RGB) sang đối tượng Color.
 Color? parseHexColor(dynamic hex) {
@@ -118,8 +90,35 @@ class LayerModel {
       _doubleOrNull(defaultStyle?['strokeOpacity']);
   double? get customCircleOpacity =>
       _doubleOrNull(defaultStyle?['circleOpacity']);
+  double? get customRasterOpacity => _doubleOrNull(
+    defaultStyle?['rasterOpacity'] ??
+        defaultStyle?['raster_opacity'] ??
+        defaultStyle?['opacity'],
+  );
 
-  Color get displayColor {
+  MapboxStyleConfig get mapboxStyle => MapboxStyleConfig.fromJson(defaultStyle);
+  List<double>? get customStrokeDasharray => mapboxStyle.strokeDasharray;
+
+  bool get computedDefaultEnabled =>
+      isEnableDefault ||
+      (defaultStyle?['visible_by_default'] == true) ||
+      (defaultStyle?['visibleByDefault'] == true);
+
+  LegendGroup? get legendGroup {
+    if (legend.isEmpty) return null;
+    final group = LegendGroup.fromRaw(
+      code.isNotEmpty ? code : id,
+      nameVi,
+      legend,
+    );
+    return group.entries.isNotEmpty ? group : null;
+  }
+
+  bool get hasValidLegend => legendGroup != null;
+
+  /// Mã màu chính thức do API trả về (từ `defaultStyle` hoặc `legend`).
+  /// Trả về null nếu backend không cấu hình màu riêng cho lớp này.
+  Color? get apiColor {
     // 1. Ưu tiên cấu hình từ defaultStyle theo hình học
     Color? styleColor;
     if (isPoint) {
@@ -152,17 +151,33 @@ class LayerModel {
         legend['strokeColor']?.toString() ??
         legend['circleColor']?.toString() ??
         legend['colorHex']?.toString();
-    final legendColor = parseHexColor(hex);
-    if (legendColor != null) return legendColor;
-
-    // 4. Fallback: Bảng màu mặc định phân giải cao
-    final seedStr = '${category}_${code}_$id';
-    final hash = seedStr.codeUnits.fold(
-      0,
-      (prev, elem) => (prev * 31 + elem) & 0x7FFFFFFF,
-    );
-    return defaultLayerColorPalette[hash % defaultLayerColorPalette.length];
+    return parseHexColor(hex);
   }
+
+  /// True nếu lớp có cấu hình mã màu từ API (không dùng màu tự sinh fallback).
+  bool get hasApiColor => apiColor != null;
+
+  /// Màu mặc định từ GeoServer theo hình học chuẩn của SLD GeoServer
+  /// khi lớp không có cấu hình màu riêng từ API:
+  /// - Point / MultiPoint: #FF0000 (Red Square Point)
+  /// - Line / MultiLineString: #0000FF (Blue Line)
+  /// - Polygon / MultiPolygon: #AAAAAA (Default Polygon)
+  Color? get geoserverDefaultColor {
+    if (geoserverLayer == null || geoserverLayer!.trim().isEmpty) return null;
+    if (isPoint) return const Color(0xFFFF0000);
+    if (isLine) return const Color(0xFF0000FF);
+    if (isPolygon) return const Color(0xFFAAAAAA);
+    return const Color(0xFFAAAAAA);
+  }
+
+  /// True nếu lớp là vector, không có mã màu cấu hình từ API, nhưng có nguồn GeoServer.
+  /// Lớp này sẽ được render qua WMS của GeoServer với `styles=` để dùng style mặc định từ GeoServer.
+  bool get usesGeoServerDefaultStyle =>
+      !isRaster && !hasApiColor && (geoserverLayer?.trim().isNotEmpty ?? false);
+
+  /// Mã màu hiển thị của lớp: ưu tiên mã màu chính thức từ API,
+  /// nếu không có thì lấy màu mặc định từ GeoServer (nếu có nguồn geoserverLayer).
+  Color? get displayColor => apiColor ?? geoserverDefaultColor;
 
   factory LayerModel.fromJson(Map<String, dynamic> json) {
     final rawLegend =

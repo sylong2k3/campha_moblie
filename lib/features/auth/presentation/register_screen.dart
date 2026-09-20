@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/theme/app_colors.dart';
 import '../../../core/l10n/l10n.dart';
 import '../domain/session_controller.dart';
 import 'auth_widgets.dart';
@@ -79,29 +80,80 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 padding: const EdgeInsets.all(24),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 440),
-                  child: Card(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainerLowest,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .outlineVariant
+                            .withValues(alpha: 0.5),
+                      ),
+                      boxShadow: AppColors.cardElevatedShadow(
+                        Theme.of(context).brightness,
+                      ),
+                    ),
                     child: Padding(
-                      padding: const EdgeInsets.all(28),
+                      padding: const EdgeInsets.all(32),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            Icons.mark_email_read_outlined,
-                            size: 54,
-                            color: Theme.of(context).colorScheme.primary,
+                          Container(
+                            width: 72,
+                            height: 72,
+                            decoration: BoxDecoration(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primaryContainer,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .primary
+                                      .withValues(alpha: 0.2),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              Icons.mark_email_read_outlined,
+                              size: 36,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onPrimaryContainer,
+                            ),
                           ),
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 24),
                           Text(
                             l10n.verificationTitle,
-                            style: Theme.of(context).textTheme.headlineSmall,
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.3,
+                                ),
                             textAlign: TextAlign.center,
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 12),
                           Text(
                             l10n.verificationBody(_verificationEmail!),
                             textAlign: TextAlign.center,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
                           ),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 28),
                           FilledButton(
                             onPressed: () => context.go('/auth/login'),
                             child: Text(l10n.backToLogin),
@@ -133,9 +185,24 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 500),
-                child: Card(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerLowest,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .outlineVariant
+                          .withValues(alpha: 0.5),
+                    ),
+                    boxShadow: AppColors.cardElevatedShadow(
+                      Theme.of(context).brightness,
+                    ),
+                  ),
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(28),
                     child: Form(
                       key: _formKey,
                       autovalidateMode: AutovalidateMode.onUserInteraction,
@@ -146,14 +213,30 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           const SizedBox(height: 24),
                           Text(
                             l10n.registerTitle,
-                            style: Theme.of(context).textTheme.headlineSmall,
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.3,
+                                ),
                           ),
                           const SizedBox(height: 6),
-                          Text(l10n.registerSubtitle),
-                          const SizedBox(height: 22),
+                          Text(
+                            l10n.registerSubtitle,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
+                          ),
+                          const SizedBox(height: 24),
                           if (_error != null) ...[
                             ErrorBanner(error: _error!),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 16),
                           ],
                           TextFormField(
                             key: const ValueKey('register-name'),
@@ -176,7 +259,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               prefixIcon: const Icon(Icons.person_outline),
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 14),
                           TextFormField(
                             key: const ValueKey('register-email'),
                             controller: _email,
@@ -190,7 +273,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               prefixIcon: const Icon(Icons.alternate_email),
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 14),
                           TextFormField(
                             controller: _phone,
                             enabled: !_submitting,
@@ -201,7 +284,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               prefixIcon: const Icon(Icons.phone_outlined),
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 14),
                           TextFormField(
                             key: const ValueKey('register-password'),
                             controller: _password,
@@ -227,7 +310,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 14),
                           TextFormField(
                             controller: _confirm,
                             enabled: !_submitting,
@@ -244,7 +327,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 12),
                           CheckboxListTile(
                             key: const ValueKey('register-consent'),
                             value: _consent,
@@ -271,7 +354,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             contentPadding: EdgeInsets.zero,
                             controlAffinity: ListTileControlAffinity.leading,
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 16),
                           FilledButton(
                             key: const ValueKey('register-submit'),
                             onPressed: _submitting ? null : _submit,
@@ -280,7 +363,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               label: l10n.registerAction,
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 14),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [

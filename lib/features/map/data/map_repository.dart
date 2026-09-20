@@ -104,7 +104,11 @@ class MapRepository {
   String tileUrlTemplate(String layerId) =>
       '${ApiConfig.baseUrl}${ApiEndpoints.mobileTileTemplate(layerId)}';
 
-  String rasterTileUrlTemplate(String geoserverLayer, {String? ticket}) {
+  String rasterTileUrlTemplate(
+    String geoserverLayer, {
+    String? ticket,
+    String? styleName,
+  }) {
     final baseUrl = ApiConfig.geoserverUrl.endsWith('/')
         ? '${ApiConfig.geoserverUrl}wms'
         : '${ApiConfig.geoserverUrl}/wms';
@@ -114,6 +118,7 @@ class MapRepository {
         'version': '1.1.1',
         'request': 'GetMap',
         'layers': geoserverLayer,
+        'styles': styleName?.trim() ?? '',
         'bbox': '{bbox-epsg-3857}',
         'width': '256',
         'height': '256',
@@ -123,7 +128,12 @@ class MapRepository {
         if (ticket != null && ticket.isNotEmpty) 'ticket': ticket,
       },
     );
-    return endpoint.toString().replaceAll('%7B', '{').replaceAll('%7D', '}');
+    final url =
+        endpoint.toString().replaceAll('%7B', '{').replaceAll('%7D', '}');
+    return url.replaceAllMapped(
+      RegExp(r'([?&]styles)(?=&|$)'),
+      (m) => '${m[1]}=',
+    );
   }
 
   /// Vé xem tile (`access=view`) cho layer raster không `isPublic`, dùng

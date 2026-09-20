@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/theme/app_colors.dart';
 import '../../../core/l10n/l10n.dart';
 import '../domain/cms_models.dart';
 import '../domain/paged_controller.dart';
@@ -60,16 +61,16 @@ class _NewsScreenState extends ConsumerState<NewsScreen>
               child: Row(
                 children: [
                   Container(
-                    width: 34,
-                    height: 34,
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primaryContainer,
+                      color: Theme.of(context).colorScheme.primary,
                       borderRadius: BorderRadius.circular(11),
                     ),
-                    child: Icon(
+                    child: const Icon(
                       Icons.verified_outlined,
                       size: 19,
-                      color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      color: Colors.white,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -78,7 +79,7 @@ class _NewsScreenState extends ConsumerState<NewsScreen>
                       l10n.newsOfficialSource,
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
@@ -164,25 +165,33 @@ class _NewsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
     return Semantics(
       button: true,
       label: '${news.title}. ${cmsDate(context, news.publishedAt)}',
-      child: Card(
+      child: Container(
+        decoration: BoxDecoration(
+          color: colors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: colors.outlineVariant.withValues(alpha: 0.5),
+          ),
+          boxShadow: emphasized
+              ? AppColors.cardElevatedShadow(brightness)
+              : AppColors.cardShadow(brightness),
+        ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           key: ValueKey('news-${news.id}'),
           onTap: () => context.push('/news/${news.id}'),
+          borderRadius: BorderRadius.circular(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (emphasized)
                 Container(
-                  height: 4,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [colors.primary, colors.secondary],
-                    ),
-                  ),
+                  height: 6,
+                  color: colors.primary,
                 ),
               Padding(
                 padding: EdgeInsets.all(emphasized ? 20 : 17),
@@ -197,20 +206,34 @@ class _NewsCard extends StatelessWidget {
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 9,
+                            horizontal: 10,
                             vertical: 5,
                           ),
                           decoration: BoxDecoration(
                             color: colors.primaryContainer,
                             borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: colors.primary.withValues(alpha: 0.12),
+                            ),
                           ),
-                          child: Text(
-                            context.l10n.newsOfficialBadge,
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(
-                                  color: colors.onPrimaryContainer,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.verified_outlined,
+                                size: 13,
+                                color: colors.onPrimaryContainer,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                context.l10n.newsOfficialBadge,
+                                style: Theme.of(context).textTheme.labelSmall
+                                    ?.copyWith(
+                                      color: colors.onPrimaryContainer,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                              ),
+                            ],
                           ),
                         ),
                         Row(
@@ -218,7 +241,7 @@ class _NewsCard extends StatelessWidget {
                           children: [
                             Icon(
                               Icons.schedule,
-                              size: 16,
+                              size: 15,
                               color: colors.onSurfaceVariant,
                             ),
                             const SizedBox(width: 5),
@@ -231,42 +254,64 @@ class _NewsCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     Text(
                       news.title,
                       maxLines: emphasized ? 3 : 2,
                       overflow: TextOverflow.ellipsis,
                       style: emphasized
-                          ? Theme.of(context).textTheme.titleLarge
-                          : Theme.of(context).textTheme.titleMedium,
+                          ? Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.2,
+                            )
+                          : Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
                     ),
                     if (news.summary.isNotEmpty) ...[
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                       Text(
                         news.summary,
                         maxLines: emphasized ? 4 : 3,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: colors.onSurfaceVariant,
+                          height: 1.45,
                         ),
                       ),
                     ],
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Text(
-                          context.l10n.newsReadMore,
-                          style: Theme.of(context).textTheme.labelLarge
-                              ?.copyWith(color: colors.primary),
+                    const SizedBox(height: 14),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 7,
                         ),
-                        const SizedBox(width: 5),
-                        Icon(
-                          Icons.arrow_forward,
-                          size: 18,
-                          color: colors.primary,
+                        decoration: BoxDecoration(
+                          color: colors.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                      ],
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              context.l10n.newsReadMore,
+                              style: Theme.of(context).textTheme.labelLarge
+                                  ?.copyWith(
+                                    color: colors.primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                            const SizedBox(width: 5),
+                            Icon(
+                              Icons.arrow_forward,
+                              size: 16,
+                              color: colors.primary,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),

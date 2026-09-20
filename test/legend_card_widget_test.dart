@@ -129,22 +129,22 @@ void main() {
     expect(deduplicateLegendItems([item, item]), hasLength(1));
   });
 
-  test('getLegendItems identifies a layer when API legend is null', () {
-    final legend = LayerLegend.fromJson({
-      'layerId': '1',
-      'code': 'lop_phu_sau_ngap_2015',
-      'nameVi': 'Lớp phủ sau ngập Cẩm Phả năm 2015',
-      'legend': <String, dynamic>{},
-    });
-    final layer = _floodLayer();
+  test(
+    'getLegendItems returns empty when layer has no API color or legend',
+    () {
+      final legend = LayerLegend.fromJson({
+        'layerId': '1',
+        'code': 'lop_phu_sau_ngap_2015',
+        'nameVi': 'Lớp phủ sau ngập Cẩm Phả năm 2015',
+        'legend': <String, dynamic>{},
+      });
+      final layer = _floodLayer();
 
-    final items = getLegendItems(legend, layer);
+      final items = getLegendItems(legend, layer);
 
-    expect(items, hasLength(1));
-    expect(items.single.label, layer.nameVi);
-    expect(items.single.color, layer.displayColor);
-    expect(items.single.isRasterGeometry, isTrue);
-  });
+      expect(items, isEmpty);
+    },
+  );
 
   test(
     'getLegendItems returns an empty list for non flood line/polygon layers with no '
@@ -163,35 +163,101 @@ void main() {
     },
   );
 
-  test('getLegendItems identifies point layer without API legend', () {
-    const pointLayer = LayerModel(
-      id: 'point-1',
-      code: 'diem_ngap',
-      nameVi: 'Điểm ngập úng đô thị',
-      category: 'diem_ngap',
-      geometryType: 'POINT',
-      storageKind: 'postgis',
-      srid: 4326,
-      isPublic: true,
-      legend: {},
-    );
-    final legend = LayerLegend.fromJson({
-      'layerId': 'point-1',
-      'code': 'diem_ngap',
-      'nameVi': 'Điểm ngập úng đô thị',
-      'legend': <String, dynamic>{},
-    });
+  test(
+    'getLegendItems uses GeoServer default colors when layer has geoserverLayer',
+    () {
+      const pointLayer = LayerModel(
+        id: 'point-1',
+        code: 'dia_danh',
+        nameVi: 'Địa danh',
+        category: 'dia_danh',
+        geometryType: 'POINT',
+        storageKind: 'postgis',
+        srid: 4326,
+        geoserverLayer: 'campha:dia_danh',
+        isPublic: true,
+        legend: {},
+      );
+      const lineLayer = LayerModel(
+        id: 'line-1',
+        code: 'ranhgioi_campha',
+        nameVi: 'Ranh giới Cẩm Phả',
+        category: 'ranh_gioi',
+        geometryType: 'LINESTRING',
+        storageKind: 'postgis',
+        srid: 4326,
+        geoserverLayer: 'campha:ranhgioi_campha',
+        isPublic: true,
+        legend: {},
+      );
+      const polyLayer = LayerModel(
+        id: 'poly-1',
+        code: 'ranh_gioi_khu_vuc',
+        nameVi: 'Ranh giới khu vực',
+        category: 'quy_hoach',
+        geometryType: 'POLYGON',
+        storageKind: 'postgis',
+        srid: 4326,
+        geoserverLayer: 'campha:ranh_gioi_khu_vuc',
+        isPublic: true,
+        legend: {},
+      );
 
-    final items = getLegendItems(legend, pointLayer);
+      final emptyLegend = LayerLegend.fromJson({
+        'layerId': 'x',
+        'code': 'x',
+        'nameVi': 'x',
+        'legend': <String, dynamic>{},
+      });
 
-    expect(items, hasLength(1));
-    expect(items.single.label, pointLayer.nameVi);
-    expect(items.single.color, pointLayer.displayColor);
-    expect(items.single.isPointGeometry, isTrue);
-  });
+      final pointItems = getLegendItems(emptyLegend, pointLayer);
+      final lineItems = getLegendItems(emptyLegend, lineLayer);
+      final polyItems = getLegendItems(emptyLegend, polyLayer);
+
+      expect(pointItems.single.color, const Color(0xFFFF0000));
+      expect(pointItems.single.isPointGeometry, isTrue);
+
+      expect(lineItems.single.color, const Color(0xFF0000FF));
+      expect(lineItems.single.isLineGeometry, isTrue);
+
+      expect(polyItems.single.color, const Color(0xFFAAAAAA));
+      expect(polyItems.single.isPolygonGeometry, isTrue);
+    },
+  );
 
   test(
-    'getLegendItems returns line and polygon items with appropriate geometryType',
+    'getLegendItems identifies point layer when API color is configured',
+    () {
+      const pointLayer = LayerModel(
+        id: 'point-1',
+        code: 'diem_ngap',
+        nameVi: 'Điểm ngập úng đô thị',
+        category: 'diem_ngap',
+        geometryType: 'POINT',
+        storageKind: 'postgis',
+        srid: 4326,
+        isPublic: true,
+        defaultStyle: {'circleColor': '#00AAFF'},
+        legend: {},
+      );
+      final legend = LayerLegend.fromJson({
+        'layerId': 'point-1',
+        'code': 'diem_ngap',
+        'nameVi': 'Điểm ngập úng đô thị',
+        'legend': <String, dynamic>{},
+      });
+
+      final items = getLegendItems(legend, pointLayer);
+
+      expect(items, hasLength(1));
+      expect(items.single.label, pointLayer.nameVi);
+      expect(items.single.color, const Color(0xFF00AAFF));
+      expect(items.single.isPointGeometry, isTrue);
+    },
+  );
+
+  test(
+    'getLegendItems returns line and polygon items when layer has apiColor',
     () {
       const lineLayer = LayerModel(
         id: 'line-1',
@@ -202,6 +268,7 @@ void main() {
         storageKind: 'postgis',
         srid: 4326,
         isPublic: true,
+        defaultStyle: {'strokeColor': '#11FF00'},
         legend: {},
       );
       const polygonLayer = LayerModel(
@@ -213,6 +280,7 @@ void main() {
         storageKind: 'postgis',
         srid: 4326,
         isPublic: true,
+        defaultStyle: {'fillColor': '#FFAA00'},
         legend: {},
       );
 
@@ -234,9 +302,11 @@ void main() {
 
       expect(lineItems, hasLength(1));
       expect(lineItems.single.label, lineLayer.nameVi);
+      expect(lineItems.single.color, const Color(0xFF11FF00));
       expect(lineItems.single.isLineGeometry, isTrue);
       expect(polyItems, hasLength(1));
       expect(polyItems.single.label, polygonLayer.nameVi);
+      expect(polyItems.single.color, const Color(0xFFFFAA00));
       expect(polyItems.single.isPolygonGeometry, isTrue);
     },
   );

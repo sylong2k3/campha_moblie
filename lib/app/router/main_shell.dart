@@ -58,7 +58,7 @@ class MainShell extends StatelessWidget {
                     labelType: NavigationRailLabelType.all,
                     groupAlignment: -0.35,
                     leading: Padding(
-                      padding: const EdgeInsets.only(top: 12, bottom: 24),
+                      padding: const EdgeInsets.only(top: 12, bottom: 28),
                       child: Semantics(
                         label: l10n.appTitle,
                         image: true,
@@ -66,13 +66,13 @@ class MainShell extends StatelessWidget {
                           width: 48,
                           height: 48,
                           decoration: BoxDecoration(
-                            color: colors.primaryContainer,
-                            borderRadius: BorderRadius.circular(16),
+                            color: colors.primary,
+                            borderRadius: BorderRadius.circular(15),
                           ),
-                          child: Icon(
+                          child: const Icon(
                             Icons.location_city_rounded,
-                            size: 27,
-                            color: colors.onPrimaryContainer,
+                            size: 26,
+                            color: Colors.white,
                           ),
                         ),
                       ),
@@ -88,7 +88,10 @@ class MainShell extends StatelessWidget {
                     ],
                   ),
                 ),
-                VerticalDivider(width: 1, color: colors.outlineVariant),
+                VerticalDivider(
+                  width: 1,
+                  color: colors.outlineVariant.withValues(alpha: 0.6),
+                ),
                 Expanded(child: navigationShell),
               ],
             ),
