@@ -204,7 +204,7 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get privacyConsent =>
-      'Tôi đồng ý cung cấp thông tin này để sử dụng dịch vụ GIS Cẩm Phả.';
+      'Tôi đồng ý với chính sách quyền riêng tư khi sử dụng dịch vụ GIS Cẩm Phả.';
 
   @override
   String get alreadyAccount => 'Đã có tài khoản?';
@@ -284,6 +284,32 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get logoutConfirmBody =>
       'Phiên và dữ liệu riêng tư trên thiết bị sẽ được xoá.';
+
+  @override
+  String get deleteAccountAction => 'Xóa tài khoản';
+
+  @override
+  String get deleteAccountConfirmTitle => 'Xóa vĩnh viễn tài khoản?';
+
+  @override
+  String get deleteAccountConfirmBody =>
+      'Toàn bộ thông tin cá nhân và dữ liệu liên quan của bạn sẽ bị xóa vĩnh viễn khỏi hệ thống Cẩm Phả GIS. Hành động này không thể hoàn tác.';
+
+  @override
+  String get deleteAccountSuccess =>
+      'Tài khoản của bạn đã được xóa thành công.';
+
+  @override
+  String get profileLegal => 'Pháp lý & Thông tin';
+
+  @override
+  String get privacyPolicyTitle => 'Chính sách bảo mật';
+
+  @override
+  String get termsOfServiceTitle => 'Điều khoản sử dụng';
+
+  @override
+  String get viewPrivacyPolicy => 'Xem Chính sách bảo mật';
 
   @override
   String get languageLabel => 'Ngôn ngữ';
@@ -1171,4 +1197,18 @@ class AppLocalizationsVi extends AppLocalizations {
   @override
   String get reportDiscardDraftBody =>
       'Ảnh, vị trí và nội dung chưa gửi sẽ bị xóa khỏi thiết bị và không thể khôi phục.';
+
+  @override
+  String get privacyConsentPrefix => 'Tôi đồng ý với ';
+
+  @override
+  String get privacyPolicyLinkText => 'chính sách quyền riêng tư';
+
+  @override
+  String get privacyConsentSuffix => ' khi sử dụng dịch vụ GIS Cẩm Phả.';
+
+  @override
+  String cannotOpenUrl(String url) {
+    return 'Không thể mở liên kết: $url';
+  }
 }

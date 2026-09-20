@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/locale/locale_controller.dart';
 import '../../../app/theme/app_colors.dart';
@@ -111,10 +112,59 @@ class ProfileScreen extends ConsumerWidget {
                               ),
                               onTap: () => _confirmLogout(context, ref),
                             ),
+                            const Divider(),
+                            ListTile(
+                              key: const ValueKey('delete-account-tile'),
+                              leading: Icon(
+                                Icons.person_remove_outlined,
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                              title: Text(
+                                l10n.deleteAccountAction,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                              ),
+                              onTap: () => _confirmDeleteAccount(context, ref),
+                            ),
                           ],
                         ),
                       ),
+                      const SizedBox(height: 20),
                     ],
+                    _SectionLabel(l10n.profileLegal),
+                    const SizedBox(height: 8),
+                    Card(
+                      child: Column(
+                        children: [
+                          ListTile(
+                            leading: const _ProfileTileIcon(
+                              icon: Icons.privacy_tip_outlined,
+                            ),
+                            title: Text(l10n.privacyPolicyTitle),
+                            trailing: const Icon(
+                              Icons.open_in_new_rounded,
+                              size: 16,
+                            ),
+                            onTap: () =>
+                                _openUrl(context, ApiConfig.privacyPolicyUrl),
+                          ),
+                          const Divider(height: 1, indent: 56),
+                          ListTile(
+                            leading: const _ProfileTileIcon(
+                              icon: Icons.description_outlined,
+                            ),
+                            title: Text(l10n.termsOfServiceTitle),
+                            trailing: const Icon(
+                              Icons.open_in_new_rounded,
+                              size: 16,
+                            ),
+                            onTap: () =>
+                                _openUrl(context, ApiConfig.termsOfServiceUrl),
+                          ),
+                        ],
+                      ),
+                    ),
                     if (kDebugMode) ...[
                       const SizedBox(height: 12),
                       Card(
@@ -194,6 +244,64 @@ class ProfileScreen extends ConsumerWidget {
     if (confirmed != true || !context.mounted) return;
     await ref.read(sessionControllerProvider.notifier).logout();
     if (context.mounted) context.go('/map');
+  }
+
+  Future<void> _confirmDeleteAccount(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final l10n = context.l10n;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(l10n.deleteAccountConfirmTitle),
+        content: Text(l10n.deleteAccountConfirmBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l10n.commonCancel),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(l10n.deleteAccountAction),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await ref.read(sessionControllerProvider.notifier).deleteAccount();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.deleteAccountSuccess)),
+        );
+        context.go('/map');
+      }
+    } catch (_) {
+      if (context.mounted) {
+        context.go('/map');
+      }
+    }
+  }
+
+  Future<void> _openUrl(BuildContext context, String urlString) async {
+    final uri = Uri.tryParse(urlString);
+    if (uri != null) {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể mở liên kết: $urlString')),
+        );
+      }
+    }
   }
 }
 

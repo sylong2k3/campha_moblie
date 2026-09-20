@@ -473,7 +473,7 @@ abstract class AppLocalizations {
   /// No description provided for @privacyConsent.
   ///
   /// In vi, this message translates to:
-  /// **'Tôi đồng ý cung cấp thông tin này để sử dụng dịch vụ GIS Cẩm Phả.'**
+  /// **'Tôi đồng ý với chính sách quyền riêng tư khi sử dụng dịch vụ GIS Cẩm Phả.'**
   String get privacyConsent;
 
   /// No description provided for @alreadyAccount.
@@ -619,6 +619,54 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Phiên và dữ liệu riêng tư trên thiết bị sẽ được xoá.'**
   String get logoutConfirmBody;
+
+  /// No description provided for @deleteAccountAction.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xóa tài khoản'**
+  String get deleteAccountAction;
+
+  /// No description provided for @deleteAccountConfirmTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xóa vĩnh viễn tài khoản?'**
+  String get deleteAccountConfirmTitle;
+
+  /// No description provided for @deleteAccountConfirmBody.
+  ///
+  /// In vi, this message translates to:
+  /// **'Toàn bộ thông tin cá nhân và dữ liệu liên quan của bạn sẽ bị xóa vĩnh viễn khỏi hệ thống Cẩm Phả GIS. Hành động này không thể hoàn tác.'**
+  String get deleteAccountConfirmBody;
+
+  /// No description provided for @deleteAccountSuccess.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tài khoản của bạn đã được xóa thành công.'**
+  String get deleteAccountSuccess;
+
+  /// No description provided for @profileLegal.
+  ///
+  /// In vi, this message translates to:
+  /// **'Pháp lý & Thông tin'**
+  String get profileLegal;
+
+  /// No description provided for @privacyPolicyTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chính sách bảo mật'**
+  String get privacyPolicyTitle;
+
+  /// No description provided for @termsOfServiceTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Điều khoản sử dụng'**
+  String get termsOfServiceTitle;
+
+  /// No description provided for @viewPrivacyPolicy.
+  ///
+  /// In vi, this message translates to:
+  /// **'Xem Chính sách bảo mật'**
+  String get viewPrivacyPolicy;
 
   /// No description provided for @languageLabel.
   ///
@@ -2221,6 +2269,30 @@ abstract class AppLocalizations {
   /// In vi, this message translates to:
   /// **'Ảnh, vị trí và nội dung chưa gửi sẽ bị xóa khỏi thiết bị và không thể khôi phục.'**
   String get reportDiscardDraftBody;
+
+  /// No description provided for @privacyConsentPrefix.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tôi đồng ý với '**
+  String get privacyConsentPrefix;
+
+  /// No description provided for @privacyPolicyLinkText.
+  ///
+  /// In vi, this message translates to:
+  /// **'chính sách quyền riêng tư'**
+  String get privacyPolicyLinkText;
+
+  /// No description provided for @privacyConsentSuffix.
+  ///
+  /// In vi, this message translates to:
+  /// **' khi sử dụng dịch vụ GIS Cẩm Phả.'**
+  String get privacyConsentSuffix;
+
+  /// No description provided for @cannotOpenUrl.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không thể mở liên kết: {url}'**
+  String cannotOpenUrl(String url);
 }
 
 class _AppLocalizationsDelegate

@@ -1,9 +1,12 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../core/l10n/l10n.dart';
+import '../../../core/network/api_config.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../domain/session_controller.dart';
 import 'auth_widgets.dart';
 
@@ -15,6 +18,8 @@ class RegisterScreen extends ConsumerStatefulWidget {
 }
 
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
+  late final TapGestureRecognizer _privacyTapRecognizer;
+
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _email = TextEditingController();
@@ -29,11 +34,37 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   String? _verificationEmail;
 
   @override
+  void initState() {
+    super.initState();
+    _privacyTapRecognizer = TapGestureRecognizer()..onTap = _openPrivacyPolicy;
+  }
+
+  @override
   void dispose() {
+    _privacyTapRecognizer.dispose();
     for (final controller in [_name, _email, _phone, _password, _confirm]) {
       controller.dispose();
     }
     super.dispose();
+  }
+
+  Future<void> _openPrivacyPolicy() async {
+    final uri = Uri.tryParse(ApiConfig.privacyPolicyUrl);
+    if (uri != null) {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              context.l10n.cannotOpenUrl(ApiConfig.privacyPolicyUrl),
+            ),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _submit() async {
@@ -328,32 +359,82 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          CheckboxListTile(
-                            key: const ValueKey('register-consent'),
-                            value: _consent,
-                            onChanged: _submitting
-                                ? null
-                                : (value) => setState(() {
-                                    _consent = value ?? false;
-                                    if (_consent) _consentError = false;
-                                  }),
-                            title: Text(
-                              l10n.privacyConsent,
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                            subtitle: _consentError
-                                ? Text(
-                                    l10n.privacyConsentRequired,
-                                    style: TextStyle(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.error,
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Checkbox(
+                                  key: const ValueKey('register-consent'),
+                                  value: _consent,
+                                  materialTapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  visualDensity: VisualDensity.compact,
+                                  onChanged: _submitting
+                                      ? null
+                                      : (value) => setState(() {
+                                          _consent = value ?? false;
+                                          if (_consent) _consentError = false;
+                                        }),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: _submitting
+                                      ? null
+                                      : () => setState(() {
+                                          _consent = !_consent;
+                                          if (_consent) _consentError = false;
+                                        }),
+                                  child: Text.rich(
+                                    TextSpan(
+                                      text: l10n.privacyConsentPrefix,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface,
+                                            height: 1.35,
+                                          ),
+                                      children: [
+                                        TextSpan(
+                                          text: l10n.privacyPolicyLinkText,
+                                          style: TextStyle(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .primary,
+                                            fontWeight: FontWeight.w600,
+                                            decoration:
+                                                TextDecoration.underline,
+                                          ),
+                                          recognizer: _privacyTapRecognizer,
+                                        ),
+                                        TextSpan(
+                                          text: l10n.privacyConsentSuffix,
+                                        ),
+                                      ],
                                     ),
-                                  )
-                                : null,
-                            contentPadding: EdgeInsets.zero,
-                            controlAffinity: ListTileControlAffinity.leading,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
+                          if (_consentError) ...[
+                            const SizedBox(height: 6),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 36),
+                              child: Text(
+                                l10n.privacyConsentRequired,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 16),
                           FilledButton(
                             key: const ValueKey('register-submit'),

@@ -171,6 +171,25 @@ class SessionController extends Notifier<SessionState> {
     }
   }
 
+  Future<void> deleteAccount() async {
+    final ownerId = state.user?.id;
+    _ownerQueue = ownerId == null
+        ? null
+        : ref.read(offlineEditQueueProvider.future);
+    try {
+      await ref.read(appPushCoordinatorProvider).unregisterDevice();
+    } catch (_) {
+      // Unregister push device best effort.
+    }
+    try {
+      await ref.read(authRepositoryProvider).deleteAccount();
+    } catch (_) {
+      // Server account deletion best effort; token and local data are purged below.
+    } finally {
+      await _clearLocalSession(ownerId);
+    }
+  }
+
   void continueAsGuest() => state = const SessionState.guest();
 
   void _onTokensCleared() {
