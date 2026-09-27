@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../app/theme/app_colors.dart';
 import '../../../core/l10n/l10n.dart';
 import '../domain/session_controller.dart';
 import 'auth_widgets.dart';
@@ -124,7 +125,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(
+        backgroundColor: AppColors.ambientGradient(
+          Theme.of(context).brightness,
+        ).colors.first,
+      ),
       body: AuthBackdrop(
         child: SafeArea(
           top: false,

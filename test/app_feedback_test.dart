@@ -1,8 +1,11 @@
+import 'package:campha_moblie/app/theme/app_colors.dart';
 import 'package:campha_moblie/app/theme/app_motion.dart';
 import 'package:campha_moblie/core/storage/token_storage.dart';
 import 'package:campha_moblie/features/auth/data/auth_repository.dart';
 import 'package:campha_moblie/features/auth/domain/auth_result.dart';
+import 'package:campha_moblie/features/auth/presentation/forgot_password_screen.dart';
 import 'package:campha_moblie/features/auth/presentation/login_screen.dart';
+import 'package:campha_moblie/features/auth/presentation/register_screen.dart';
 import 'package:campha_moblie/features/cms/presentation/cms_widgets.dart';
 import 'package:campha_moblie/features/field_reports/domain/report_composer_controller.dart';
 import 'package:campha_moblie/features/field_reports/presentation/create_field_report_screen.dart';
@@ -444,6 +447,35 @@ void main() {
 
     expect(controller.locateCalls, 1);
     expect(find.text('Dịch vụ vị trí đang tắt.'), findsNothing);
+  });
+
+  testWidgets('auth back bars match backdrop in light and dark', (
+    tester,
+  ) async {
+    for (final screen in [
+      const RegisterScreen(),
+      const ForgotPasswordScreen(),
+    ]) {
+      for (final brightness in [Brightness.light, Brightness.dark]) {
+        await tester.pumpWidget(
+          ProviderScope(
+            child: MaterialApp(
+              theme: ThemeData(brightness: brightness),
+              locale: const Locale('vi'),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: screen,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          tester.widget<AppBar>(find.byType(AppBar)).backgroundColor,
+          AppColors.ambientGradient(brightness).colors.first,
+        );
+      }
+    }
   });
 
   testWidgets('debug login shows horizontal role strip below forgot password', (
