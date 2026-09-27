@@ -145,10 +145,21 @@ class CrashlyticsService {
   }
 
   /// Hàm kiểm thử tạo Crash tức thì (dùng cho Developer / Tester kiểm tra trên Firebase Console).
-  static void testCrash() {
+  /// Trả về `false` nếu Firebase chưa được khởi tạo.
+  static bool testCrash() {
+    if (Firebase.apps.isEmpty) {
+      if (kDebugMode) {
+        debugPrint(
+          '[Crashlytics] Không thể test crash: Firebase chưa được khởi tạo '
+          '(thiếu google-services.json hoặc GoogleService-Info.plist).',
+        );
+      }
+      return false;
+    }
     if (kDebugMode) {
       debugPrint('[Crashlytics] Triggering test crash...');
     }
     FirebaseCrashlytics.instance.crash();
+    return true;
   }
 }

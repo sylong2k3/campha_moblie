@@ -22,15 +22,25 @@ class BasemapSelectionSheet extends ConsumerWidget {
             children: [
               Row(
                 children: [
-                  Icon(
-                    Icons.map_outlined,
-                    color: Theme.of(context).colorScheme.primary,
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary,
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: const Icon(
+                      Icons.map_outlined,
+                      size: 20,
+                      color: Colors.white,
+                    ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Text(
                     context.l10n.mapBasemapTitle,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.2,
                     ),
                   ),
                 ],

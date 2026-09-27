@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../core/l10n/l10n.dart';
 import '../../features/auth/presentation/auth_widgets.dart';
-import '../theme/app_colors.dart';
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
@@ -13,7 +12,7 @@ class SplashScreen extends StatelessWidget {
     return Scaffold(
       body: DecoratedBox(
         decoration: BoxDecoration(
-          gradient: AppColors.brandGradient(Theme.of(context).brightness),
+          color: Theme.of(context).colorScheme.primary,
         ),
         child: SafeArea(
           child: Center(

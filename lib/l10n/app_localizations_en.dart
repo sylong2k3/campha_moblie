@@ -209,7 +209,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privacyConsent =>
-      'I agree to provide this information to use Cam Pha GIS services.';
+      'I agree to the privacy policy when using Cam Pha GIS services.';
 
   @override
   String get alreadyAccount => 'Already have an account?';
@@ -288,6 +288,32 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get logoutConfirmBody =>
       'Your session and private data on this device will be removed.';
+
+  @override
+  String get deleteAccountAction => 'Delete account';
+
+  @override
+  String get deleteAccountConfirmTitle => 'Permanently delete account?';
+
+  @override
+  String get deleteAccountConfirmBody =>
+      'All your personal information and associated data will be permanently removed from Cam Pha GIS. This action cannot be undone.';
+
+  @override
+  String get deleteAccountSuccess =>
+      'Your account has been deleted successfully.';
+
+  @override
+  String get profileLegal => 'Legal & About';
+
+  @override
+  String get privacyPolicyTitle => 'Privacy Policy';
+
+  @override
+  String get termsOfServiceTitle => 'Terms of Service';
+
+  @override
+  String get viewPrivacyPolicy => 'View Privacy Policy';
 
   @override
   String get languageLabel => 'Language';
@@ -1178,4 +1204,18 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get reportDiscardDraftBody =>
       'Unsaved photos, location, and description will be removed from this device and cannot be recovered.';
+
+  @override
+  String get privacyConsentPrefix => 'I agree to the ';
+
+  @override
+  String get privacyPolicyLinkText => 'privacy policy';
+
+  @override
+  String get privacyConsentSuffix => ' when using Cam Pha GIS services.';
+
+  @override
+  String cannotOpenUrl(String url) {
+    return 'Could not open link: $url';
+  }
 }

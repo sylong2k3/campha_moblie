@@ -1,11 +1,1 @@
-{
-  "flutter": {
-    "platforms": {
-      "android": {
-        "default": {
-          "projectId": "web-gis-80f8b"
-        }
-      }
-    }
-  }
-}
+{"flutter":{"platforms":{"android":{"default":{"projectId":"web-gis-80f8b","appId":"1:330038602831:android:f75a2e6caabb48aeb14e3a","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"web-gis-80f8b","appId":"1:330038602831:ios:01b4c790bbea46bbb14e3a","uploadDebugSymbols":true,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"web-gis-80f8b","configurations":{"android":"1:330038602831:android:f75a2e6caabb48aeb14e3a","ios":"1:330038602831:ios:01b4c790bbea46bbb14e3a"}}}}}}

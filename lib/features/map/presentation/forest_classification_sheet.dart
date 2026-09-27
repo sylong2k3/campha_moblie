@@ -169,10 +169,7 @@ class _ForestClassificationSheetState
                       ),
                     ),
                   const SizedBox(height: 12),
-                  _ForestLegendCard(
-                    legend: snapshot.legend,
-                    number: number,
-                  ),
+                  _ForestLegendCard(legend: snapshot.legend, number: number),
                 ],
               ],
             ),
@@ -184,7 +181,8 @@ class _ForestClassificationSheetState
 }
 
 Color _parseColor(String hex) => Color(
-      int.tryParse('FF${hex.replaceAll('#', '')}', radix: 16) ?? 0xFF94A3B8);
+  int.tryParse('FF${hex.replaceAll('#', '')}', radix: 16) ?? 0xFF94A3B8,
+);
 
 class _ForestLegendCard extends StatelessWidget {
   const _ForestLegendCard({required this.legend, required this.number});
@@ -258,8 +256,7 @@ class _ForestLegendCard extends StatelessWidget {
                 separatorBuilder: (_, _) => const SizedBox(width: 16),
                 itemBuilder: (context, colIndex) {
                   final start = colIndex * _rowsPerColumn;
-                  final end =
-                      (start + _rowsPerColumn).clamp(0, legend.length);
+                  final end = (start + _rowsPerColumn).clamp(0, legend.length);
                   final columnItems = legend.sublist(start, end);
                   return SizedBox(
                     width: _columnWidth,

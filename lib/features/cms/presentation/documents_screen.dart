@@ -60,16 +60,16 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen>
               child: Row(
                 children: [
                   Container(
-                    width: 34,
-                    height: 34,
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.secondaryContainer,
+                      color: Theme.of(context).colorScheme.primary,
                       borderRadius: BorderRadius.circular(11),
                     ),
-                    child: Icon(
+                    child: const Icon(
                       Icons.verified_user_outlined,
                       size: 19,
-                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                      color: Colors.white,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -78,7 +78,7 @@ class _DocumentsScreenState extends ConsumerState<DocumentsScreen>
                       l10n.documentsVerifiedSource,
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),

@@ -15,7 +15,13 @@
   "notificationsDeleteConfirm": "Xóa thông báo này? Thao tác không thể hoàn tác.",
   "notificationsJustNow": "Vừa xong",
   "notificationsDaysAgo": "{count} ngày trước",
-  "@notificationsDaysAgo": {"placeholders": {"count": {"type": "int"}}},
+  "@notificationsDaysAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "commonCancel": "Huỷ",
   "commonConfirm": "Xác nhận",
   "commonClose": "Đóng",
@@ -63,12 +69,18 @@
   "fullNameLabel": "Họ và tên",
   "phoneLabel": "Số điện thoại (không bắt buộc)",
   "confirmPasswordLabel": "Nhập lại mật khẩu",
-  "privacyConsent": "Tôi đồng ý cung cấp thông tin này để sử dụng dịch vụ GIS Cẩm Phả.",
+  "privacyConsent": "Tôi đồng ý với chính sách quyền riêng tư khi sử dụng dịch vụ GIS Cẩm Phả.",
   "alreadyAccount": "Đã có tài khoản?",
   "passwordMismatch": "Mật khẩu nhập lại chưa khớp",
   "verificationTitle": "Kiểm tra hộp thư",
   "verificationBody": "Liên kết xác minh đã được gửi tới {email}. Xác minh email trước khi đăng nhập.",
-  "@verificationBody": {"placeholders": {"email": {"type": "String"}}},
+  "@verificationBody": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
   "continueAsGuest": "Tiếp tục với tư cách khách",
   "forgotTitle": "Khôi phục mật khẩu",
   "forgotSubtitle": "Nhập email. Nếu tài khoản tồn tại, hướng dẫn khôi phục sẽ được gửi an toàn.",
@@ -89,6 +101,14 @@
   "logoutAction": "Đăng xuất",
   "logoutConfirmTitle": "Đăng xuất khỏi thiết bị?",
   "logoutConfirmBody": "Phiên và dữ liệu riêng tư trên thiết bị sẽ được xoá.",
+  "deleteAccountAction": "Xóa tài khoản",
+  "deleteAccountConfirmTitle": "Xóa vĩnh viễn tài khoản?",
+  "deleteAccountConfirmBody": "Toàn bộ thông tin cá nhân và dữ liệu liên quan của bạn sẽ bị xóa vĩnh viễn khỏi hệ thống Cẩm Phả GIS. Hành động này không thể hoàn tác.",
+  "deleteAccountSuccess": "Tài khoản của bạn đã được xóa thành công.",
+  "profileLegal": "Pháp lý & Thông tin",
+  "privacyPolicyTitle": "Chính sách bảo mật",
+  "termsOfServiceTitle": "Điều khoản sử dụng",
+  "viewPrivacyPolicy": "Xem Chính sách bảo mật",
   "languageLabel": "Ngôn ngữ",
   "languageVietnamese": "Tiếng Việt",
   "languageEnglish": "English",
@@ -102,7 +122,13 @@
   "mapLoading": "Đang tải nền bản đồ…",
   "mapConfigMissing": "Bản đồ chưa được cấu hình trên môi trường này.",
   "featureUpcomingTitle": "{title} đang được hoàn thiện",
-  "@featureUpcomingTitle": {"placeholders": {"title": {"type": "String"}}},
+  "@featureUpcomingTitle": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
   "featureUpcomingBody": "Nền tảng và điều hướng đã sẵn sàng. Dữ liệu thật sẽ được nối đúng Sprint, không dùng nội dung giả.",
   "reportsIntro": "Theo dõi và gửi thông tin hiện trường trên địa bàn thành phố.",
   "newsIntro": "Tin tức chính thống, cập nhật từ hệ thống Cẩm Phả.",
@@ -161,7 +187,13 @@
   "cmsInternalAccessDeniedBody": "Nội dung này chỉ dành cho cán bộ được phân quyền. Vui lòng liên hệ quản trị viên nếu cần hỗ trợ.",
   "mapLayersTitle": "Lớp dữ liệu bản đồ",
   "mapActiveLayers": "{count} lớp đang hiển thị",
-  "@mapActiveLayers": {"placeholders": {"count": {"type": "int"}}},
+  "@mapActiveLayers": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "mapDisableAll": "Tắt tất cả",
   "mapEnableAll": "Bật tất cả",
   "mapLayerSearchHint": "Tìm lớp dữ liệu",
@@ -177,21 +209,45 @@
   "mapSearchEmpty": "Không tìm thấy đối tượng phù hợp trong các lớp đang bật.",
   "mapSearchNoActiveLayers": "Chưa có lớp dữ liệu nào được bật. Vui lòng bật lớp trên bản đồ để tìm kiếm đối tượng.",
   "mapSearchActiveScope": "Đang tìm trong {count} lớp đang hiển thị",
-  "@mapSearchActiveScope": {"placeholders": {"count": {"type": "int"}}},
+  "@mapSearchActiveScope": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "mapFeatureTitle": "Thông tin đối tượng",
   "mapFeatureId": "Mã đối tượng",
   "mapAttributesTitle": "Thuộc tính",
   "mapAttributesEmpty": "Không có thuộc tính được phép hiển thị.",
   "mapGeometryTitle": "Hình học",
   "mapGeometryPoints": "{count} điểm tọa độ",
-  "@mapGeometryPoints": {"placeholders": {"count": {"type": "int"}}},
+  "@mapGeometryPoints": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "mapLayerRenderError": "Không thể hiển thị lớp {name}.",
-  "@mapLayerRenderError": {"placeholders": {"name": {"type": "String"}}},
+  "@mapLayerRenderError": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "mapTileError": "Một lớp bản đồ chưa tải được",
   "mapRecenter": "Về trung tâm Cẩm Phả",
   "mapGpsAction": "Vị trí của tôi",
   "mapLayersCount": "Lớp dữ liệu ({count})",
-  "@mapLayersCount": {"placeholders": {"count": {"type": "int"}}},
+  "@mapLayersCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "mapInfoAction": "Tra cứu đối tượng",
   "mapTapInfoHint": "Chạm trực tiếp vào đối tượng đang hiển thị để mở thông tin.",
   "fieldToolsTitle": "Công cụ hiện trường",
@@ -205,9 +261,21 @@
   "locationOpenSettings": "Mở cài đặt",
   "locationOutsideBounds": "Vị trí nằm ngoài phạm vi Cẩm Phả hỗ trợ.",
   "locationAccuracy": "Độ chính xác ±{meters} m",
-  "@locationAccuracy": {"placeholders": {"meters": {"type": "String"}}},
+  "@locationAccuracy": {
+    "placeholders": {
+      "meters": {
+        "type": "String"
+      }
+    }
+  },
   "locationAccuracyLow": "Độ chính xác thấp · sai số ±{meters} m",
-  "@locationAccuracyLow": {"placeholders": {"meters": {"type": "String"}}},
+  "@locationAccuracyLow": {
+    "placeholders": {
+      "meters": {
+        "type": "String"
+      }
+    }
+  },
   "locationAccuracyUnavailable": "Chưa có thông tin độ chính xác.",
   "weatherUnavailable": "Chưa thể lấy thời tiết lúc này.",
   "weatherTemperature": "Nhiệt độ",
@@ -216,21 +284,45 @@
   "nearbyTitle": "Đối tượng gần vị trí",
   "nearbyEmpty": "Không có đối tượng trong bán kính hiện tại.",
   "nearbyDistance": "Cách {meters} m",
-  "@nearbyDistance": {"placeholders": {"meters": {"type": "String"}}},
+  "@nearbyDistance": {
+    "placeholders": {
+      "meters": {
+        "type": "String"
+      }
+    }
+  },
   "measureTitle": "Đo đạc",
   "measureDistance": "Khoảng cách",
   "measureArea": "Diện tích",
   "measureTapHint": "Chạm bản đồ để thêm điểm đo",
   "measurePointCount": "{count} điểm",
-  "@measurePointCount": {"placeholders": {"count": {"type": "int"}}},
+  "@measurePointCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "measureUndo": "Hoàn tác",
   "measureRedo": "Làm lại",
   "measureComplete": "Xác nhận đo",
   "measureOfficial": "Hệ thống xác nhận",
   "measureLengthResult": "{value} m",
-  "@measureLengthResult": {"placeholders": {"value": {"type": "String"}}},
+  "@measureLengthResult": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
   "measureAreaResult": "{value} m²",
-  "@measureAreaResult": {"placeholders": {"value": {"type": "String"}}},
+  "@measureAreaResult": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
   "routeTitle": "Tìm đường",
   "routeSelectHint": "Chạm bản đồ lần lượt để chọn điểm đầu và điểm cuối. Tuyến được tính bằng Mapbox.",
   "routeStart": "Điểm đầu",
@@ -240,7 +332,13 @@
   "routeFind": "Tìm tuyến",
   "routeSourceMapbox": "Nguồn định tuyến: Mapbox",
   "routeDistance": "Chiều dài {value} m",
-  "@routeDistance": {"placeholders": {"value": {"type": "String"}}},
+  "@routeDistance": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
   "fieldToolSheetDragHint": "Kéo lên để xem thêm, kéo xuống để xem bản đồ",
   "routeInstructionFallback": "Tuyến đường đã sẵn sàng.",
   "fieldToolCancel": "Thoát công cụ",
@@ -260,11 +358,29 @@
   "reportPublicEmpty": "Chưa có phản ánh công khai.",
   "reportFilteredEmpty": "Không có phản ánh phù hợp bộ lọc.",
   "reportDaysAgo": "{count} ngày trước",
-  "@reportDaysAgo": {"placeholders": {"count": {"type": "int"}}},
+  "@reportDaysAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "reportHoursAgo": "{count} giờ trước",
-  "@reportHoursAgo": {"placeholders": {"count": {"type": "int"}}},
+  "@reportHoursAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "reportMinutesAgo": "{count} phút trước",
-  "@reportMinutesAgo": {"placeholders": {"count": {"type": "int"}}},
+  "@reportMinutesAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "reportEvidenceStep": "Minh chứng",
   "reportLocationStep": "Vị trí",
   "reportDescriptionStep": "Nội dung",
@@ -308,7 +424,13 @@
   "featureActionChanged": "Thay đổi",
   "featureRestoreTitle": "Khôi phục phiên bản",
   "featureRestoreCreatesVersion": "Khôi phục phiên bản {version} sẽ tạo một phiên bản mới; không ghi đè lịch sử.",
-  "@featureRestoreCreatesVersion": {"placeholders": {"version": {"type": "int"}}},
+  "@featureRestoreCreatesVersion": {
+    "placeholders": {
+      "version": {
+        "type": "int"
+      }
+    }
+  },
   "featureRestoreAction": "Khôi phục",
   "featureRestoreSuccess": "Đã tạo phiên bản khôi phục mới.",
   "featureSyncTitle": "Thay đổi offline",
@@ -325,7 +447,13 @@
   "reportNearbyFilterTitle": "Phản ánh gần vị trí hiện tại",
   "reportNearbyDateRange": "Khoảng thời gian",
   "reportNearbyRadius": "Bán kính: {meters} m",
-  "@reportNearbyRadius": {"placeholders": {"meters": {"type": "int"}}},
+  "@reportNearbyRadius": {
+    "placeholders": {
+      "meters": {
+        "type": "int"
+      }
+    }
+  },
   "reportNearbyApply": "Dùng vị trí hiện tại",
   "featureChangedBy": "Người thay đổi",
   "brandTagline": "Đô thị trong tầm tay",
@@ -341,22 +469,58 @@
   "fullNameMaxLength": "Họ tên tối đa 255 ký tự",
   "privacyConsentRequired": "Xác nhận đồng ý trước khi đăng ký",
   "mapActiveTool": "Đang dùng: {name}",
-  "@mapActiveTool": {"placeholders": {"name": {"type": "String"}}},
+  "@mapActiveTool": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "mapLayerOpacity": "Độ hiển thị {percent}%",
-  "@mapLayerOpacity": {"placeholders": {"percent": {"type": "int"}}},
+  "@mapLayerOpacity": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
   "measureDistanceRequired": "Chạm thêm 1 điểm để bắt đầu đo khoảng cách.",
   "measureAreaRequired": "Chạm thêm điểm để tạo vùng đo diện tích.",
   "routeStartRequired": "Chọn điểm đầu trên bản đồ.",
   "routeEndRequired": "Chọn điểm cuối trên bản đồ.",
   "routeEstimatedMinutes": "Thời gian dự kiến: {minutes} phút",
-  "@routeEstimatedMinutes": {"placeholders": {"minutes": {"type": "int"}}},
+  "@routeEstimatedMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
   "routeMinutesShort": "{minutes} phút",
-  "@routeMinutesShort": {"placeholders": {"minutes": {"type": "int"}}},
+  "@routeMinutesShort": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
   "draftPoint": "Điểm",
   "draftLine": "Đường",
   "draftPolygon": "Vùng",
   "reportStepProgress": "Bước {current}/{total} · {title}",
-  "@reportStepProgress": {"placeholders": {"current": {"type": "int"}, "total": {"type": "int"}, "title": {"type": "String"}}},
+  "@reportStepProgress": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "title": {
+        "type": "String"
+      }
+    }
+  },
   "reportDraftAutosaved": "Bản nháp được tự động lưu trên thiết bị.",
   "reportEvidenceRequired": "Thêm ít nhất 1 ảnh để tiếp tục.",
   "reportLocationRequired": "Chọn vị trí để tiếp tục.",
@@ -367,7 +531,16 @@
   "reportCameraPermissionDenied": "Chưa được cấp quyền máy ảnh. Mở cài đặt để cấp lại.",
   "reportPhotoLimit": "Đã đủ 5 ảnh minh chứng.",
   "reportPhotoPosition": "Ảnh {current} trên {total}",
-  "@reportPhotoPosition": {"placeholders": {"current": {"type": "int"}, "total": {"type": "int"}}},
+  "@reportPhotoPosition": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "locationLocating": "Đang xác định vị trí…",
   "featureNoChanges": "Thay đổi ít nhất một thuộc tính hoặc tọa độ trước khi lưu.",
   "featureLongitude": "Kinh độ",
@@ -379,5 +552,16 @@
   "featureSyncing": "Đang đồng bộ",
   "featureSyncRejectedReason": "Thay đổi này không thể đồng bộ. Kiểm tra dữ liệu hoặc xóa khỏi hàng đợi.",
   "reportDiscardDraftTitle": "Xóa bản nháp phản ánh?",
-  "reportDiscardDraftBody": "Ảnh, vị trí và nội dung chưa gửi sẽ bị xóa khỏi thiết bị và không thể khôi phục."
+  "reportDiscardDraftBody": "Ảnh, vị trí và nội dung chưa gửi sẽ bị xóa khỏi thiết bị và không thể khôi phục.",
+  "privacyConsentPrefix": "Tôi đồng ý với ",
+  "privacyPolicyLinkText": "chính sách quyền riêng tư",
+  "privacyConsentSuffix": " khi sử dụng dịch vụ GIS Cẩm Phả.",
+  "cannotOpenUrl": "Không thể mở liên kết: {url}",
+  "@cannotOpenUrl": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  }
 }

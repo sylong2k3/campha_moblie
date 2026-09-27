@@ -137,7 +137,10 @@ List<LegendColorItem> getLegendItems(LayerLegend legend, [LayerModel? layer]) {
     for (var i = 0; i < rawEntries.length; i++) {
       final entry = rawEntries[i];
       if (entry is Map) {
-        final labelRaw = entry['label'] ?? entry['name'] ?? 'Mục ${i + 1}';
+        final labelRaw =
+            entry['label'] ??
+            entry['name'] ??
+            (entry['value'] != null ? '${entry['value']}' : 'Mục ${i + 1}');
         String label = '';
         if (labelRaw is Map) {
           label =
@@ -188,14 +191,15 @@ List<LegendColorItem> getLegendItems(LayerLegend legend, [LayerModel? layer]) {
   }
 
   if (items.isNotEmpty) return deduplicateLegendItems(items);
-  if (layer == null) return items;
+  final color = layer?.displayColor;
+  if (layer == null || color == null) return items;
 
-  // API chưa cấu hình `legend`: nhận diện lớp bằng tên và màu đại diện.
-  // Không suy diễn các cấp phân loại hoặc màu pixel của ảnh raster.
+  // Nếu API chưa cấu hình danh sách chú giải chi tiết:
+  // nhận diện lớp bằng tên và mã màu (từ API hoặc màu mặc định GeoServer).
   return [
     LegendColorItem(
       label: layer.nameVi,
-      color: layer.displayColor,
+      color: color,
       geometryType: geometryType,
       isPoint: layer.isPoint,
     ),
@@ -222,11 +226,13 @@ class LayerLegendCard extends StatelessWidget {
     required this.title,
     required this.items,
     this.onClose,
+    this.onExpand,
   });
 
   final String title;
   final List<LegendColorItem> items;
   final VoidCallback? onClose;
+  final VoidCallback? onExpand;
 
   static const int _rowsPerColumn = 3;
   static const double _rowHeight = 30;
@@ -288,6 +294,21 @@ class LayerLegendCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (onExpand != null)
+                  IconButton(
+                    key: const ValueKey('map-legend-expand'),
+                    tooltip: 'Xem danh sách chi tiết',
+                    constraints: const BoxConstraints(
+                      minWidth: 40,
+                      minHeight: 48,
+                    ),
+                    onPressed: onExpand,
+                    icon: Icon(
+                      Icons.open_in_full_rounded,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.outline,
+                    ),
+                  ),
                 if (onClose != null)
                   IconButton(
                     key: const ValueKey('map-legend-close'),
@@ -295,7 +316,7 @@ class LayerLegendCard extends StatelessWidget {
                       context,
                     ).closeButtonTooltip,
                     constraints: const BoxConstraints(
-                      minWidth: 48,
+                      minWidth: 40,
                       minHeight: 48,
                     ),
                     onPressed: onClose,

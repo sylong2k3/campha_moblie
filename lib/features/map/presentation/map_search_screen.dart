@@ -111,7 +111,9 @@ class _MapSearchScreenState extends ConsumerState<MapSearchScreen> {
     });
     try {
       // Nếu chỉ có 1 lớp đang bật, truyền layerId để backend chỉ quét đúng bảng đó
-      final singleActiveLayerId = activeIds.length == 1 ? activeIds.first : null;
+      final singleActiveLayerId = activeIds.length == 1
+          ? activeIds.first
+          : null;
       final results = await ref
           .read(mapRepositoryProvider)
           .searchFeatures(
@@ -129,17 +131,19 @@ class _MapSearchScreenState extends ConsumerState<MapSearchScreen> {
       // Lọc kết quả chỉ giữ lại các đối tượng thuộc các lớp đang được bật
       final filteredResults = (catalog.layers.isEmpty || activeIds.isEmpty)
           ? results
-          : results.where((item) {
-              if (activeIds.contains(item.layerId)) return true;
-              for (final layer in catalog.layers) {
-                if (activeIds.contains(layer.id) &&
-                    (layer.code == item.layerCode ||
-                        layer.nameVi == item.layerName)) {
-                  return true;
-                }
-              }
-              return false;
-            }).toList(growable: false);
+          : results
+                .where((item) {
+                  if (activeIds.contains(item.layerId)) return true;
+                  for (final layer in catalog.layers) {
+                    if (activeIds.contains(layer.id) &&
+                        (layer.code == item.layerCode ||
+                            layer.nameVi == item.layerName)) {
+                      return true;
+                    }
+                  }
+                  return false;
+                })
+                .toList(growable: false);
 
       setState(() {
         _results = filteredResults;
@@ -287,8 +291,11 @@ class _MapSearchScreenState extends ConsumerState<MapSearchScreen> {
                                             break;
                                           }
                                         }
-                                        final color = matchingLayer?.displayColor ??
-                                            Theme.of(context).colorScheme.primary;
+                                        final color =
+                                            matchingLayer?.displayColor ??
+                                            Theme.of(
+                                              context,
+                                            ).colorScheme.primary;
                                         final icon = matchingLayer == null
                                             ? Icons.location_on_outlined
                                             : matchingLayer.isPoint
@@ -301,15 +308,15 @@ class _MapSearchScreenState extends ConsumerState<MapSearchScreen> {
                                           key: ValueKey(
                                             'map-result-${item.layerId}-${item.featureId}',
                                           ),
-                                          leading: Icon(
-                                            icon,
-                                            color: color,
-                                          ),
+                                          leading: Icon(icon, color: color),
                                           title: Text(item.label),
                                           subtitle: Text(
-                                            matchingLayer?.nameVi ?? item.layerCode,
+                                            matchingLayer?.nameVi ??
+                                                item.layerCode,
                                           ),
-                                          trailing: const Icon(Icons.north_east),
+                                          trailing: const Icon(
+                                            Icons.north_east,
+                                          ),
                                           onTap: () => context.pop(item),
                                         );
                                       },

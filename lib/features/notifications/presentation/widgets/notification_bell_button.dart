@@ -7,7 +7,7 @@ import '../../../../core/l10n/l10n.dart';
 import '../../../auth/domain/session_controller.dart';
 import '../../domain/notification_controller.dart';
 
-bool _bellNavigating = false;
+int _lastBellTapTime = 0;
 
 class NotificationBellButton extends ConsumerWidget {
   final Color? color;
@@ -34,11 +34,10 @@ class NotificationBellButton extends ConsumerWidget {
         child: Icon(Icons.notifications_outlined, color: color),
       ),
       onPressed: () {
-        if (_bellNavigating) return;
-        _bellNavigating = true;
-        context.push(RoutePaths.notifications).whenComplete(() {
-          _bellNavigating = false;
-        });
+        final now = DateTime.now().millisecondsSinceEpoch;
+        if (now - _lastBellTapTime < 500) return;
+        _lastBellTapTime = now;
+        context.push(RoutePaths.notifications);
       },
     );
   }

@@ -1,11 +1,8 @@
-import 'package:campha_moblie/app/theme/app_colors.dart';
 import 'package:campha_moblie/app/theme/app_motion.dart';
 import 'package:campha_moblie/core/storage/token_storage.dart';
 import 'package:campha_moblie/features/auth/data/auth_repository.dart';
 import 'package:campha_moblie/features/auth/domain/auth_result.dart';
-import 'package:campha_moblie/features/auth/presentation/forgot_password_screen.dart';
 import 'package:campha_moblie/features/auth/presentation/login_screen.dart';
-import 'package:campha_moblie/features/auth/presentation/register_screen.dart';
 import 'package:campha_moblie/features/cms/presentation/cms_widgets.dart';
 import 'package:campha_moblie/features/field_reports/domain/report_composer_controller.dart';
 import 'package:campha_moblie/features/field_reports/presentation/create_field_report_screen.dart';
@@ -449,33 +446,25 @@ void main() {
     expect(find.text('Dịch vụ vị trí đang tắt.'), findsNothing);
   });
 
-  testWidgets('auth back bars match backdrop in light and dark', (
-    tester,
-  ) async {
-    for (final screen in [
-      const RegisterScreen(),
-      const ForgotPasswordScreen(),
-    ]) {
-      for (final brightness in [Brightness.light, Brightness.dark]) {
-        await tester.pumpWidget(
-          ProviderScope(
-            child: MaterialApp(
-              theme: ThemeData(brightness: brightness),
-              locale: const Locale('vi'),
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
-              supportedLocales: AppLocalizations.supportedLocales,
-              home: screen,
-            ),
-          ),
-        );
-        await tester.pumpAndSettle();
+  testWidgets('login exposes a localized back action', (tester) async {
+    await tester.pumpWidget(
+      const _LocalizedApp(home: LoginScreen(returnTo: '/reports/new')),
+    );
 
-        expect(
-          tester.widget<AppBar>(find.byType(AppBar)).backgroundColor,
-          AppColors.ambientGradient(brightness).colors.first,
-        );
-      }
-    }
+    final back = find.byKey(const ValueKey('login-back'));
+    expect(back, findsOneWidget);
+    expect(
+      find.descendant(of: back, matching: find.text('Quay lại')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: back,
+        matching: find.byIcon(Icons.arrow_back_rounded),
+      ),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('debug login shows horizontal role strip below forgot password', (
@@ -510,7 +499,9 @@ void main() {
       expect(find.byKey(ValueKey('test-account-$role')), findsOneWidget);
     }
 
-    await tester.tap(find.byKey(const ValueKey('test-account-citizen')));
+    final citizenAccount = find.byKey(const ValueKey('test-account-citizen'));
+    await tester.ensureVisible(citizenAccount);
+    await tester.tap(citizenAccount);
     await tester.pump();
 
     expect(
@@ -552,7 +543,9 @@ void main() {
     );
     await tester.pump();
 
-    await tester.tap(find.byKey(const ValueKey('test-account-citizen')));
+    final citizenAccount = find.byKey(const ValueKey('test-account-citizen'));
+    await tester.ensureVisible(citizenAccount);
+    await tester.tap(citizenAccount);
     await tester.pump();
 
     expect(repository.loginCalls, 1);

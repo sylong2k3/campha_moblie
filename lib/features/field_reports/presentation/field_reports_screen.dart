@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:campha_moblie/app/theme/app_motion.dart';
 import 'package:flutter/material.dart';
@@ -11,6 +10,7 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import '../../../core/location/map_defaults.dart';
 
 import '../../../app/router/route_names.dart';
+import '../../../app/theme/app_colors.dart';
 import '../../../core/error/error_l10n.dart';
 import '../../../core/l10n/l10n.dart';
 import '../../../core/location/location_helper.dart';
@@ -973,14 +973,24 @@ class _ReportCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final colors = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
     return Semantics(
       button: true,
       label:
           '${report.referenceCode}, ${_status(context, report.status)}, ${report.description}',
-      child: Card(
+      child: Container(
+        decoration: BoxDecoration(
+          color: colors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: colors.outlineVariant.withValues(alpha: 0.5),
+          ),
+          boxShadow: AppColors.cardShadow(brightness),
+        ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           key: ValueKey('report-card-${report.id}'),
+          borderRadius: BorderRadius.circular(16),
           onTap: () => showModalBottomSheet<void>(
             context: context,
             showDragHandle: true,
@@ -998,6 +1008,9 @@ class _ReportCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: colors.primaryContainer,
                     borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: colors.primary.withValues(alpha: 0.1),
+                    ),
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -1011,6 +1024,7 @@ class _ReportCard extends StatelessWidget {
                         '${report.photoCount}',
                         style: Theme.of(context).textTheme.labelLarge?.copyWith(
                           color: colors.onPrimaryContainer,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
@@ -1027,7 +1041,10 @@ class _ReportCard extends StatelessWidget {
                             child: Text(
                               report.referenceCode,
                               style: Theme.of(context).textTheme.labelLarge
-                                  ?.copyWith(color: colors.primary),
+                                  ?.copyWith(
+                                    color: colors.primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                             ),
                           ),
                           _StatusPill(status: report.status),
@@ -1038,34 +1055,46 @@ class _ReportCard extends StatelessWidget {
                         report.description,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyLarge,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                       const SizedBox(height: 10),
-                      Row(
+                      Wrap(
+                        spacing: 14,
+                        runSpacing: 6,
                         children: [
-                          Icon(
-                            Icons.schedule,
-                            size: 16,
-                            color: colors.onSurfaceVariant,
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.schedule,
+                                size: 15,
+                                color: colors.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                _relative(report.createdAt, l10n),
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 5),
-                          Text(
-                            _relative(report.createdAt, l10n),
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          if (report.distanceMeters != null) ...[
-                            const SizedBox(width: 14),
-                            Icon(
-                              Icons.near_me_outlined,
-                              size: 16,
-                              color: colors.onSurfaceVariant,
+                          if (report.distanceMeters != null)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.near_me_outlined,
+                                  size: 15,
+                                  color: colors.onSurfaceVariant,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${report.distanceMeters!.round()} m',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${report.distanceMeters!.round()} m',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
                         ],
                       ),
                     ],
@@ -1133,22 +1162,48 @@ class _StatusPill extends StatelessWidget {
   final String status;
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final resolved = status == 'resolved';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: resolved ? colors.secondaryContainer : colors.tertiaryContainer,
-        borderRadius: BorderRadius.circular(20),
+    final (bg, fg, icon) = switch (status) {
+      'resolved' => (
+        AppColors.successSoft(Theme.of(context).brightness),
+        AppColors.statusResolved,
+        Icons.check_circle_outline,
       ),
-      child: Text(
-        _status(context, status),
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: resolved
-              ? colors.onSecondaryContainer
-              : colors.onTertiaryContainer,
-          fontWeight: FontWeight.w700,
-        ),
+      'in_progress' => (
+        AppColors.warningSoft(Theme.of(context).brightness),
+        AppColors.statusInProgress,
+        Icons.autorenew,
+      ),
+      'rejected' || 'error' => (
+        AppColors.errorSoft(Theme.of(context).brightness),
+        AppColors.statusError,
+        Icons.error_outline,
+      ),
+      _ => (
+        AppColors.infoSoft(Theme.of(context).brightness),
+        AppColors.statusNew,
+        Icons.fiber_new_outlined,
+      ),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: fg.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: fg),
+          const SizedBox(width: 4),
+          Text(
+            _status(context, status),
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: fg,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1167,45 +1222,68 @@ class _ReportMapState extends State<_ReportMap> {
   String? _fittedReportSignature;
   final _reportsByAnnotationId = <String, FieldReport>{};
 
+  static CameraState? _persistedReportMapCamera;
+
+  void _onCameraChange(CameraChangedEventData event) {
+    _persistedReportMapCamera = event.cameraState;
+  }
+
   static final _camPhaFallback = (
     center: MapDefaults.center,
-    zoom: 12.0,
+    zoom: MapDefaults.defaultZoom,
   );
 
   ({Point center, double zoom}) _viewportForReports() {
-    assert(widget.items.isNotEmpty);
-    var minLongitude = widget.items.first.location.longitude;
-    var maxLongitude = minLongitude;
-    var minLatitude = widget.items.first.location.latitude;
-    var maxLatitude = minLatitude;
-    for (final report in widget.items.skip(1)) {
-      minLongitude = math.min(minLongitude, report.location.longitude);
-      maxLongitude = math.max(maxLongitude, report.location.longitude);
-      minLatitude = math.min(minLatitude, report.location.latitude);
-      maxLatitude = math.max(maxLatitude, report.location.latitude);
+    final saved = _persistedReportMapCamera;
+    if (saved != null) {
+      return (
+        center: saved.center,
+        zoom: saved.zoom,
+      );
     }
+    return _camPhaFallback;
+  }
 
-    final latitude = (minLatitude + maxLatitude) / 2;
-    final longitude = (minLongitude + maxLongitude) / 2;
+  Future<void> _recenter() {
+    _persistedReportMapCamera = null;
+    return _map?.flyTo(
+      CameraOptions(
+        center: MapDefaults.center,
+        zoom: MapDefaults.defaultZoom,
+      ),
+      MapAnimationOptions(duration: AppMotion.camera(context, far: true)),
+    ) ??
+    Future.value();
+  }
 
-    // Fallback về Cẩm Phả nếu center tính ra nằm ngoài bounds.
-    final computed = GeoCoordinate(longitude, latitude);
-    if (!computed.isInCamPhaBounds) return _camPhaFallback;
+  Future<void> _zoomIn() async {
+    final map = _map;
+    if (map == null) return;
+    final duration = AppMotion.camera(context, far: false);
+    try {
+      final cameraState = await map.getCameraState();
+      final targetZoom =
+          (cameraState.zoom + 1.0).clamp(MapDefaults.minZoom, MapDefaults.maxZoom);
+      await map.flyTo(
+        CameraOptions(zoom: targetZoom),
+        MapAnimationOptions(duration: duration),
+      );
+    } catch (_) {}
+  }
 
-    final longitudeSpan =
-        (maxLongitude - minLongitude).abs() *
-        math.cos(latitude * math.pi / 180);
-    final span = math
-        .max(longitudeSpan, (maxLatitude - minLatitude).abs())
-        .clamp(0.0035, 1)
-        .toDouble();
-    final zoom = (math.log(360 / span) / math.ln2 - 1.25)
-        .clamp(10.5, 15.5)
-        .toDouble();
-    return (
-      center: Point(coordinates: Position(longitude, latitude)),
-      zoom: zoom,
-    );
+  Future<void> _zoomOut() async {
+    final map = _map;
+    if (map == null) return;
+    final duration = AppMotion.camera(context, far: false);
+    try {
+      final cameraState = await map.getCameraState();
+      final targetZoom =
+          (cameraState.zoom - 1.0).clamp(MapDefaults.minZoom, MapDefaults.maxZoom);
+      await map.flyTo(
+        CameraOptions(zoom: targetZoom),
+        MapAnimationOptions(duration: duration),
+      );
+    } catch (_) {}
   }
 
   String get _reportSignature => widget.items
@@ -1286,39 +1364,141 @@ class _ReportMapState extends State<_ReportMap> {
       center: viewport.center,
       zoom: viewport.zoom,
     );
-    return MapWidget(
-      key: const ValueKey('reports-map'),
-      viewport: _initialViewport,
-      onMapCreated: (map) async {
-        _map = map;
-        await map.setBounds(
-          CameraBoundsOptions(
-            bounds: CoordinateBounds(
-              southwest: Point(coordinates: Position(106.3, 20.5)),
-              northeast: Point(coordinates: Position(108.5, 21.7)),
-              infiniteBounds: false,
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: MapWidget(
+            key: const ValueKey('reports-map'),
+            viewport: _initialViewport,
+            onCameraChangeListener: _onCameraChange,
+            onMapCreated: (map) async {
+              _map = map;
+              await map.setBounds(MapDefaults.cameraBounds);
+              final saved = _persistedReportMapCamera;
+              if (saved != null) {
+                await map.setCamera(
+                  CameraOptions(
+                    center: saved.center,
+                    zoom: saved.zoom,
+                    bearing: saved.bearing,
+                    pitch: saved.pitch,
+                  ),
+                );
+              }
+              await map.gestures.updateSettings(
+                GesturesSettings(
+                  scrollEnabled: true,
+                  pinchToZoomEnabled: true,
+                  doubleTapToZoomInEnabled: true,
+                  doubleTouchToZoomOutEnabled: true,
+                  quickZoomEnabled: true,
+                ),
+              );
+              final manager =
+                  await map.annotations.createCircleAnnotationManager();
+              if (!mounted) return;
+              manager.tapEvents(onTap: _openReportFromAnnotation);
+              _manager = manager;
+              await _render();
+            },
+          ),
+        ),
+        Positioned(
+          top: 16,
+          right: 16,
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _ReportMapControlGroup(
+                  children: [
+                    _ReportMapControl(
+                      key: const ValueKey('reports-map-zoom-in'),
+                      icon: Icons.add_rounded,
+                      tooltip: 'Phóng to',
+                      onTap: _zoomIn,
+                    ),
+                    _ReportMapControl(
+                      key: const ValueKey('reports-map-zoom-out'),
+                      icon: Icons.remove_rounded,
+                      tooltip: 'Thu nhỏ',
+                      onTap: _zoomOut,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                _ReportMapControlGroup(
+                  children: [
+                    _ReportMapControl(
+                      key: const ValueKey('reports-map-recenter'),
+                      icon: Icons.explore_outlined,
+                      tooltip: 'Toàn cảnh Cẩm Phả',
+                      onTap: _recenter,
+                    ),
+                  ],
+                ),
+              ],
             ),
-            minZoom: 6.5,
-            maxZoom: 20.0,
           ),
-        );
-        await map.gestures.updateSettings(
-          GesturesSettings(
-            scrollEnabled: true,
-            pinchToZoomEnabled: true,
-            doubleTapToZoomInEnabled: true,
-            doubleTouchToZoomOutEnabled: true,
-            quickZoomEnabled: true,
-          ),
-        );
-        final manager = await map.annotations.createCircleAnnotationManager();
-        if (!mounted) return;
-        manager.tapEvents(onTap: _openReportFromAnnotation);
-        _manager = manager;
-        await _render();
-      },
+        ),
+      ],
     );
   }
+}
+
+class _ReportMapControlGroup extends StatelessWidget {
+  const _ReportMapControlGroup({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    elevation: 2,
+    shadowColor: AppColors.primaryDeep.withValues(alpha: 0.14),
+    color: Theme.of(
+      context,
+    ).colorScheme.surfaceContainerLowest.withValues(alpha: 0.97),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(14),
+      side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var index = 0; index < children.length; index++) ...[
+          children[index],
+          if (index != children.length - 1)
+            SizedBox(
+              width: 28,
+              child: Divider(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
+        ],
+      ],
+    ),
+  );
+}
+
+class _ReportMapControl extends StatelessWidget {
+  const _ReportMapControl({
+    super.key,
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => IconButton(
+    tooltip: tooltip,
+    color: Theme.of(context).colorScheme.onSurfaceVariant,
+    onPressed: onTap,
+    icon: Icon(icon),
+  );
 }
 
 String _status(BuildContext context, String status) => switch (status) {

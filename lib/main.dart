@@ -25,6 +25,10 @@ Future<void> main() async {
   await runZonedGuarded(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+      // Khóa toàn bộ ứng dụng ở chiều dọc trước khi hiển thị giao diện.
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+      ]);
 
       // Tối ưu RAM theo chính sách Google Play & thiết bị Low-RAM:
       // Giới hạn bộ đệm ảnh trong RAM (mặc định 1000 ảnh / 100MB) xuống 100 ảnh / 25MB.

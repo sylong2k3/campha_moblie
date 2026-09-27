@@ -130,6 +130,18 @@ class AuthRepository {
     }
   }
 
+  Future<void> deleteAccount() async {
+    try {
+      if (await tokenStorage.readAccessToken() != null) {
+        await dio.delete<Map<String, dynamic>>(ApiEndpoints.authMe);
+      }
+    } catch (_) {
+      // Remote account deletion is best effort if endpoint unavailable; local tokens are cleared unconditionally.
+    } finally {
+      await tokenStorage.clear();
+    }
+  }
+
   Map<String, dynamic> _readData(Map<String, dynamic>? envelope) {
     final data = envelope?['data'];
     if (data is! Map) {

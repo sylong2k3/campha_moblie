@@ -15,7 +15,13 @@
   "notificationsDeleteConfirm": "Delete this notification? This action cannot be undone.",
   "notificationsJustNow": "Just now",
   "notificationsDaysAgo": "{count, plural, =1{1 day ago} other{{count} days ago}}",
-  "@notificationsDaysAgo": {"placeholders": {"count": {"type": "int"}}},
+  "@notificationsDaysAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "commonCancel": "Cancel",
   "commonConfirm": "Confirm",
   "commonClose": "Close",
@@ -63,12 +69,18 @@
   "fullNameLabel": "Full name",
   "phoneLabel": "Phone number (optional)",
   "confirmPasswordLabel": "Confirm password",
-  "privacyConsent": "I agree to provide this information to use Cam Pha GIS services.",
+  "privacyConsent": "I agree to the privacy policy when using Cam Pha GIS services.",
   "alreadyAccount": "Already have an account?",
   "passwordMismatch": "Passwords do not match",
   "verificationTitle": "Check your inbox",
   "verificationBody": "A verification link was sent to {email}. Verify your email before signing in.",
-  "@verificationBody": {"placeholders": {"email": {"type": "String"}}},
+  "@verificationBody": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
   "continueAsGuest": "Continue as guest",
   "forgotTitle": "Recover password",
   "forgotSubtitle": "Enter your email. If the account exists, recovery instructions will be sent securely.",
@@ -89,6 +101,14 @@
   "logoutAction": "Sign out",
   "logoutConfirmTitle": "Sign out from this device?",
   "logoutConfirmBody": "Your session and private data on this device will be removed.",
+  "deleteAccountAction": "Delete account",
+  "deleteAccountConfirmTitle": "Permanently delete account?",
+  "deleteAccountConfirmBody": "All your personal information and associated data will be permanently removed from Cam Pha GIS. This action cannot be undone.",
+  "deleteAccountSuccess": "Your account has been deleted successfully.",
+  "profileLegal": "Legal & About",
+  "privacyPolicyTitle": "Privacy Policy",
+  "termsOfServiceTitle": "Terms of Service",
+  "viewPrivacyPolicy": "View Privacy Policy",
   "languageLabel": "Language",
   "languageVietnamese": "Tiếng Việt",
   "languageEnglish": "English",
@@ -102,7 +122,13 @@
   "mapLoading": "Loading basemap…",
   "mapConfigMissing": "The map is not configured in this environment.",
   "featureUpcomingTitle": "{title} is being completed",
-  "@featureUpcomingTitle": {"placeholders": {"title": {"type": "String"}}},
+  "@featureUpcomingTitle": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
   "featureUpcomingBody": "Foundation and navigation are ready. Live data will be connected in its scheduled Sprint without mock content.",
   "reportsIntro": "Track and submit field information across the city.",
   "newsIntro": "Official updates from Cam Pha systems.",
@@ -161,7 +187,13 @@
   "cmsInternalAccessDeniedBody": "This content is restricted to authorized staff. Contact an administrator if you need access.",
   "mapLayersTitle": "Map data layers",
   "mapActiveLayers": "{count} active layers",
-  "@mapActiveLayers": {"placeholders": {"count": {"type": "int"}}},
+  "@mapActiveLayers": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "mapDisableAll": "Disable all",
   "mapEnableAll": "Enable all",
   "mapLayerSearchHint": "Search data layers",
@@ -177,21 +209,45 @@
   "mapSearchEmpty": "No matching features found in active layers.",
   "mapSearchNoActiveLayers": "No layers are currently enabled. Please enable data layers on the map to search.",
   "mapSearchActiveScope": "Searching across {count} active layers",
-  "@mapSearchActiveScope": {"placeholders": {"count": {"type": "int"}}},
+  "@mapSearchActiveScope": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "mapFeatureTitle": "Feature information",
   "mapFeatureId": "Feature ID",
   "mapAttributesTitle": "Attributes",
   "mapAttributesEmpty": "No attributes are allowed for display.",
   "mapGeometryTitle": "Geometry",
   "mapGeometryPoints": "{count} coordinate points",
-  "@mapGeometryPoints": {"placeholders": {"count": {"type": "int"}}},
+  "@mapGeometryPoints": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "mapLayerRenderError": "Unable to display {name}.",
-  "@mapLayerRenderError": {"placeholders": {"name": {"type": "String"}}},
+  "@mapLayerRenderError": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "mapTileError": "A map layer could not load",
   "mapRecenter": "Return to Cam Pha",
   "mapGpsAction": "My location",
   "mapLayersCount": "Data layers ({count})",
-  "@mapLayersCount": {"placeholders": {"count": {"type": "int"}}},
+  "@mapLayersCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "mapInfoAction": "Identify feature",
   "mapTapInfoHint": "Tap a rendered feature to open its information.",
   "fieldToolsTitle": "Field tools",
@@ -205,9 +261,21 @@
   "locationOpenSettings": "Open settings",
   "locationOutsideBounds": "Location is outside the supported Cam Pha area.",
   "locationAccuracy": "Accuracy ±{meters} m",
-  "@locationAccuracy": {"placeholders": {"meters": {"type": "String"}}},
+  "@locationAccuracy": {
+    "placeholders": {
+      "meters": {
+        "type": "String"
+      }
+    }
+  },
   "locationAccuracyLow": "Low accuracy · ±{meters} m uncertainty",
-  "@locationAccuracyLow": {"placeholders": {"meters": {"type": "String"}}},
+  "@locationAccuracyLow": {
+    "placeholders": {
+      "meters": {
+        "type": "String"
+      }
+    }
+  },
   "locationAccuracyUnavailable": "Accuracy information is unavailable.",
   "weatherUnavailable": "Weather is unavailable right now.",
   "weatherTemperature": "Temperature",
@@ -216,21 +284,45 @@
   "nearbyTitle": "Nearby features",
   "nearbyEmpty": "No features were found within the current radius.",
   "nearbyDistance": "{meters} m away",
-  "@nearbyDistance": {"placeholders": {"meters": {"type": "String"}}},
+  "@nearbyDistance": {
+    "placeholders": {
+      "meters": {
+        "type": "String"
+      }
+    }
+  },
   "measureTitle": "Measure",
   "measureDistance": "Distance",
   "measureArea": "Area",
   "measureTapHint": "Tap the map to add measurement points",
   "measurePointCount": "{count} points",
-  "@measurePointCount": {"placeholders": {"count": {"type": "int"}}},
+  "@measurePointCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "measureUndo": "Undo",
   "measureRedo": "Redo",
   "measureComplete": "Confirm measurement",
   "measureOfficial": "System verified",
   "measureLengthResult": "{value} m",
-  "@measureLengthResult": {"placeholders": {"value": {"type": "String"}}},
+  "@measureLengthResult": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
   "measureAreaResult": "{value} m²",
-  "@measureAreaResult": {"placeholders": {"value": {"type": "String"}}},
+  "@measureAreaResult": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
   "routeTitle": "Directions",
   "routeSelectHint": "Tap the map to select start then end. Mapbox calculates the route.",
   "routeStart": "Start",
@@ -240,7 +332,13 @@
   "routeFind": "Find route",
   "routeSourceMapbox": "Routing source: Mapbox",
   "routeDistance": "Length {value} m",
-  "@routeDistance": {"placeholders": {"value": {"type": "String"}}},
+  "@routeDistance": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
   "fieldToolSheetDragHint": "Swipe up for more, down to see the map",
   "routeInstructionFallback": "Continue along the route",
   "fieldToolCancel": "Exit tool",
@@ -260,11 +358,29 @@
   "reportPublicEmpty": "No public reports yet.",
   "reportFilteredEmpty": "No reports match these filters.",
   "reportDaysAgo": "{count} days ago",
-  "@reportDaysAgo": {"placeholders": {"count": {"type": "int"}}},
+  "@reportDaysAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "reportHoursAgo": "{count} hours ago",
-  "@reportHoursAgo": {"placeholders": {"count": {"type": "int"}}},
+  "@reportHoursAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "reportMinutesAgo": "{count} minutes ago",
-  "@reportMinutesAgo": {"placeholders": {"count": {"type": "int"}}},
+  "@reportMinutesAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "reportEvidenceStep": "Evidence",
   "reportLocationStep": "Location",
   "reportDescriptionStep": "Description",
@@ -308,7 +424,13 @@
   "featureActionChanged": "Changed",
   "featureRestoreTitle": "Restore version",
   "featureRestoreCreatesVersion": "Restoring version {version} creates a new version and does not overwrite history.",
-  "@featureRestoreCreatesVersion": {"placeholders": {"version": {"type": "int"}}},
+  "@featureRestoreCreatesVersion": {
+    "placeholders": {
+      "version": {
+        "type": "int"
+      }
+    }
+  },
   "featureRestoreAction": "Restore",
   "featureRestoreSuccess": "New restored version created.",
   "featureSyncTitle": "Offline changes",
@@ -325,7 +447,13 @@
   "reportNearbyFilterTitle": "Reports near current location",
   "reportNearbyDateRange": "Date range",
   "reportNearbyRadius": "Radius: {meters} m",
-  "@reportNearbyRadius": {"placeholders": {"meters": {"type": "int"}}},
+  "@reportNearbyRadius": {
+    "placeholders": {
+      "meters": {
+        "type": "int"
+      }
+    }
+  },
   "reportNearbyApply": "Use current location",
   "featureChangedBy": "Changed by",
   "brandTagline": "The city at your fingertips",
@@ -341,22 +469,58 @@
   "fullNameMaxLength": "Full name cannot exceed 255 characters",
   "privacyConsentRequired": "Confirm consent before registering",
   "mapActiveTool": "Active: {name}",
-  "@mapActiveTool": {"placeholders": {"name": {"type": "String"}}},
+  "@mapActiveTool": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "mapLayerOpacity": "Visibility {percent}%",
-  "@mapLayerOpacity": {"placeholders": {"percent": {"type": "int"}}},
+  "@mapLayerOpacity": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
   "measureDistanceRequired": "Tap 1 more point to start measuring distance.",
   "measureAreaRequired": "Tap more points to create an area measurement.",
   "routeStartRequired": "Select a start point on the map.",
   "routeEndRequired": "Select an end point on the map.",
   "routeEstimatedMinutes": "Estimated time: {minutes} min",
-  "@routeEstimatedMinutes": {"placeholders": {"minutes": {"type": "int"}}},
+  "@routeEstimatedMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
   "routeMinutesShort": "{minutes} min",
-  "@routeMinutesShort": {"placeholders": {"minutes": {"type": "int"}}},
+  "@routeMinutesShort": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
   "draftPoint": "Point",
   "draftLine": "Line",
   "draftPolygon": "Area",
   "reportStepProgress": "Step {current}/{total} · {title}",
-  "@reportStepProgress": {"placeholders": {"current": {"type": "int"}, "total": {"type": "int"}, "title": {"type": "String"}}},
+  "@reportStepProgress": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      },
+      "title": {
+        "type": "String"
+      }
+    }
+  },
   "reportDraftAutosaved": "This draft is saved automatically on this device.",
   "reportEvidenceRequired": "Add at least 1 photo to continue.",
   "reportLocationRequired": "Choose a location to continue.",
@@ -367,7 +531,16 @@
   "reportCameraPermissionDenied": "Camera permission was not granted. Open settings to enable it.",
   "reportPhotoLimit": "The 5-photo evidence limit has been reached.",
   "reportPhotoPosition": "Photo {current} of {total}",
-  "@reportPhotoPosition": {"placeholders": {"current": {"type": "int"}, "total": {"type": "int"}}},
+  "@reportPhotoPosition": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "locationLocating": "Locating…",
   "featureNoChanges": "Change at least one attribute or coordinate before saving.",
   "featureLongitude": "Longitude",
@@ -379,5 +552,16 @@
   "featureSyncing": "Syncing",
   "featureSyncRejectedReason": "This change cannot be synced. Review its data or remove it from the queue.",
   "reportDiscardDraftTitle": "Delete report draft?",
-  "reportDiscardDraftBody": "Unsaved photos, location, and description will be removed from this device and cannot be recovered."
+  "reportDiscardDraftBody": "Unsaved photos, location, and description will be removed from this device and cannot be recovered.",
+  "privacyConsentPrefix": "I agree to the ",
+  "privacyPolicyLinkText": "privacy policy",
+  "privacyConsentSuffix": " when using Cam Pha GIS services.",
+  "cannotOpenUrl": "Could not open link: {url}",
+  "@cannotOpenUrl": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  }
 }

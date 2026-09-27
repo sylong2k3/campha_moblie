@@ -8,6 +8,7 @@ import '../../shared/presentation/app_feedback.dart';
 import '../../shared/presentation/app_search_field.dart';
 import '../domain/layer_model.dart';
 import '../domain/map_controller.dart';
+import 'dynamic_legend_sheet.dart';
 import 'legend_card_widget.dart';
 
 class LayerCatalogSheet extends ConsumerStatefulWidget {
@@ -118,6 +119,30 @@ class _LayerCatalogSheetState extends ConsumerState<LayerCatalogSheet> {
                           TextButton(
                             onPressed: controller.disableAll,
                             child: Text(context.l10n.mapDisableAll),
+                          ),
+                        if (state.activeCount > 0 &&
+                            state.layers.any(
+                              (l) =>
+                                  state.activeLayerIds.contains(l.id) &&
+                                  l.hasValidLegend,
+                            ))
+                          TextButton.icon(
+                            icon: const Icon(Icons.palette_outlined, size: 16),
+                            label: const Text('Xem chú giải'),
+                            onPressed: () {
+                              final activeLegends = state.layers
+                                  .where(
+                                    (l) =>
+                                        state.activeLayerIds.contains(l.id) &&
+                                        l.hasValidLegend,
+                                  )
+                                  .map((l) => l.legendGroup!)
+                                  .toList();
+                              DynamicLegendBottomSheet.show(
+                                context,
+                                activeLegends,
+                              );
+                            },
                           ),
                       ],
                     ),
@@ -242,15 +267,9 @@ class _CategorySection extends StatelessWidget {
             layer: layer,
             state: state,
             controller: controller,
-            // Đánh số riêng cho point (chọn icon) và cho line/polygon (chọn
-            // màu) trong phạm vi category, để hai layer cùng loại hình học
-            // không bao giờ trùng icon/màu với nhau.
             pointIconIndex: layer.isPoint
                 ? layers.where((l) => l.isPoint).toList().indexOf(layer)
                 : 0,
-            colorIndex: layer.isPoint
-                ? 0
-                : layers.where((l) => !l.isPoint).toList().indexOf(layer),
           ),
       ],
     ),
@@ -285,14 +304,12 @@ class _LayerRow extends ConsumerWidget {
     required this.state,
     required this.controller,
     required this.pointIconIndex,
-    required this.colorIndex,
   });
 
   final LayerModel layer;
   final MapCatalogState state;
   final MapCatalogController controller;
   final int pointIconIndex;
-  final int colorIndex;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -302,7 +319,7 @@ class _LayerRow extends ConsumerWidget {
         : layer.isLine
         ? Icons.timeline
         : Icons.hexagon_outlined;
-    final color = layer.displayColor;
+    final color = layer.displayColor ?? Theme.of(context).colorScheme.primary;
     return Column(
       children: [
         SwitchListTile(

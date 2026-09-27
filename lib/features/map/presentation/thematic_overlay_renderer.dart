@@ -182,6 +182,7 @@ class ThematicOverlayRenderer {
                 id: layer.layerId,
                 sourceId: layer.sourceId,
                 rasterOpacity: layer.opacity,
+                rasterFadeDuration: 0,
               );
               await map.style.addLayer(raster);
             }
@@ -193,8 +194,10 @@ class ThematicOverlayRenderer {
             );
             if (!_current(revision)) break;
             final below = _belowLayerId;
-            final position = below != null && await map.style.styleLayerExists(below)
-                ? LayerPosition(below: below) : null;
+            final position =
+                below != null && await map.style.styleLayerExists(below)
+                ? LayerPosition(below: below)
+                : null;
             if (!_current(revision)) break;
             await map.style.moveStyleLayer(layer.layerId, position);
           } catch (error) {

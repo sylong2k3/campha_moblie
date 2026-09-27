@@ -54,18 +54,28 @@ void main() {
     expect(layer.isPolygon, isFalse);
   });
 
-  test('keeps Mapbox placeholders in GeoServer WMS template', () {
-    final repository = MapRepository(dio: Dio());
-    final url = repository.rasterTileUrlTemplate(
-      'campha:lop_phu_truoc_ngap_2015',
-    );
+  test(
+    'keeps Mapbox placeholders in GeoServer WMS template and passes styles parameter',
+    () {
+      final repository = MapRepository(dio: Dio());
+      final url = repository.rasterTileUrlTemplate(
+        'campha:lop_phu_truoc_ngap_2015',
+      );
 
-    expect(url, contains('service=WMS'));
-    expect(url, contains('bbox={bbox-epsg-3857}'));
-    expect(url, contains('srs=EPSG%3A3857'));
-    expect(url, isNot(contains('%7B')));
-    expect(url, isNot(contains('%7D')));
-  });
+      expect(url, contains('service=WMS'));
+      expect(url, contains('bbox={bbox-epsg-3857}'));
+      expect(url, contains('srs=EPSG%3A3857'));
+      expect(url, contains('styles='));
+      expect(url, isNot(contains('%7B')));
+      expect(url, isNot(contains('%7D')));
+
+      final customStyleUrl = repository.rasterTileUrlTemplate(
+        'campha:lop_phu_truoc_ngap_2015',
+        styleName: 'custom_sld',
+      );
+      expect(customStyleUrl, contains('styles=custom_sld'));
+    },
+  );
 
   test('parses snake_case basemap and search GeoJSON point', () {
     final basemap = BasemapModel.fromJson({
@@ -116,21 +126,74 @@ void main() {
     expect(feature.version, 4);
   });
 
-  test('falls back to the default palette when server sets no color', () {
-    final layer = LayerModel.fromJson({
-      'id': '42',
-      'code': 'song_tieu_thoat_nuoc',
-      'nameVi': 'Sông tiêu thoát nước',
-      'category': 'thuy_van',
-      'geometryType': 'LINESTRING',
-      'storageKind': 'postgis',
-      'srid': 4326,
-      'legend': {},
-      'isPublic': true,
-    });
+  test(
+    'uses GeoServer default color in displayColor when server sets no color but has geoserverLayer',
+    () {
+      final layerWithGeoserver = LayerModel.fromJson({
+        'id': '42',
+        'code': 'song_tieu_thoat_nuoc',
+        'nameVi': 'Sông tiêu thoát nước',
+        'category': 'thuy_van',
+        'geometryType': 'LINESTRING',
+        'storageKind': 'postgis',
+        'srid': 4326,
+        'geoserverLayer': 'campha:song_tieu_thoat_nuoc',
+        'legend': {},
+        'isPublic': true,
+      });
 
-    expect(defaultLayerColorPalette, contains(layer.displayColor));
-  });
+      expect(layerWithGeoserver.hasApiColor, isFalse);
+      expect(layerWithGeoserver.apiColor, isNull);
+      expect(layerWithGeoserver.geoserverDefaultColor, const Color(0xFF0000FF));
+      expect(layerWithGeoserver.displayColor, const Color(0xFF0000FF));
+      expect(layerWithGeoserver.usesGeoServerDefaultStyle, isTrue);
+
+      final pointGeoserver = LayerModel.fromJson({
+        'id': '44',
+        'code': 'dia_danh',
+        'nameVi': 'Địa danh',
+        'category': 'dia_danh',
+        'geometryType': 'MULTIPOINT',
+        'storageKind': 'postgis',
+        'srid': 4326,
+        'geoserverLayer': 'campha:dia_danh',
+        'legend': {},
+        'isPublic': true,
+      });
+      expect(pointGeoserver.displayColor, const Color(0xFFFF0000));
+
+      final polyGeoserver = LayerModel.fromJson({
+        'id': '45',
+        'code': 'ranh_gioi_khu_vuc',
+        'nameVi': 'Ranh giới khu vực',
+        'category': 'quy_hoach',
+        'geometryType': 'MULTIPOLYGON',
+        'storageKind': 'postgis',
+        'srid': 4326,
+        'geoserverLayer': 'campha:ranh_gioi_khu_vuc',
+        'legend': {},
+        'isPublic': true,
+      });
+      expect(polyGeoserver.displayColor, const Color(0xFFAAAAAA));
+
+      final layerWithoutGeoserver = LayerModel.fromJson({
+        'id': '43',
+        'code': 'layer_no_geoserver',
+        'nameVi': 'Lớp không có GeoServer',
+        'category': 'khac',
+        'geometryType': 'LINESTRING',
+        'storageKind': 'postgis',
+        'srid': 4326,
+        'legend': {},
+        'isPublic': true,
+      });
+
+      expect(layerWithoutGeoserver.hasApiColor, isFalse);
+      expect(layerWithoutGeoserver.geoserverDefaultColor, isNull);
+      expect(layerWithoutGeoserver.displayColor, isNull);
+      expect(layerWithoutGeoserver.usesGeoServerDefaultStyle, isFalse);
+    },
+  );
 
   test('server-provided legend color takes priority over default', () {
     final layer = LayerModel.fromJson({
@@ -169,45 +232,48 @@ void main() {
     );
   });
 
-  test('identifies boundary and hydrology layers while excluding flood overlay', () {
-    final boundary = LayerModel.fromJson({
-      'id': '1',
-      'code': 'ranhgioi_campha',
-      'nameVi': 'Ranh giới Cẩm Phả',
-      'category': 'ranh_gioi',
-      'geometryType': 'MULTILINESTRING',
-      'storageKind': 'postgis',
-      'srid': 4326,
-      'legend': {},
-      'isPublic': true,
-    });
-    final hydro = LayerModel.fromJson({
-      'id': '2',
-      'code': 'song_tieu_thoat_nuoc',
-      'nameVi': 'Sông suối tiêu thoát nước',
-      'category': 'thuy_van',
-      'geometryType': 'LINESTRING',
-      'storageKind': 'postgis',
-      'srid': 4326,
-      'legend': {},
-      'isPublic': true,
-    });
-    final flood = LayerModel.fromJson({
-      'id': '3',
-      'code': 'lop_phu_sau_ngap_2015',
-      'nameVi': 'Lớp phủ sau ngập 2015',
-      'category': 'lop_phu_ngap',
-      'geometryType': 'RASTER',
-      'storageKind': 'geotiff_minio',
-      'srid': 3857,
-      'legend': {},
-      'isPublic': true,
-    });
+  test(
+    'identifies boundary and hydrology layers while excluding flood overlay',
+    () {
+      final boundary = LayerModel.fromJson({
+        'id': '1',
+        'code': 'ranhgioi_campha',
+        'nameVi': 'Ranh giới Cẩm Phả',
+        'category': 'ranh_gioi',
+        'geometryType': 'MULTILINESTRING',
+        'storageKind': 'postgis',
+        'srid': 4326,
+        'legend': {},
+        'isPublic': true,
+      });
+      final hydro = LayerModel.fromJson({
+        'id': '2',
+        'code': 'song_tieu_thoat_nuoc',
+        'nameVi': 'Sông suối tiêu thoát nước',
+        'category': 'thuy_van',
+        'geometryType': 'LINESTRING',
+        'storageKind': 'postgis',
+        'srid': 4326,
+        'legend': {},
+        'isPublic': true,
+      });
+      final flood = LayerModel.fromJson({
+        'id': '3',
+        'code': 'lop_phu_sau_ngap_2015',
+        'nameVi': 'Lớp phủ sau ngập 2015',
+        'category': 'lop_phu_ngap',
+        'geometryType': 'RASTER',
+        'storageKind': 'geotiff_minio',
+        'srid': 3857,
+        'legend': {},
+        'isPublic': true,
+      });
 
-    expect(boundary.isRaster, isFalse);
-    expect(hydro.isRaster, isFalse);
-    expect(flood.isRaster, isTrue);
-  });
+      expect(boundary.isRaster, isFalse);
+      expect(hydro.isRaster, isFalse);
+      expect(flood.isRaster, isTrue);
+    },
+  );
 
   test('parses isEnableDefault from various API field formats', () {
     final camelCase = LayerModel.fromJson({
@@ -261,29 +327,27 @@ void main() {
     expect(disabled.isEnableDefault, isFalse);
   });
 
-  test('defaultStyle color takes precedence over legend and default palette', () {
-    final layer = LayerModel.fromJson({
-      'id': '10',
-      'code': 'boundary_styled',
-      'nameVi': 'Ranh giới',
-      'category': 'ranh_gioi',
-      'geometryType': 'LINESTRING',
-      'storageKind': 'postgis',
-      'srid': 4326,
-      'isPublic': true,
-      'defaultStyle': {
-        'strokeColor': '#FF0055',
-        'strokeWidth': 4.0,
-      },
-      'legend': {
-        'color': '#00AA00',
-      },
-    });
+  test(
+    'defaultStyle color takes precedence over legend and default palette',
+    () {
+      final layer = LayerModel.fromJson({
+        'id': '10',
+        'code': 'boundary_styled',
+        'nameVi': 'Ranh giới',
+        'category': 'ranh_gioi',
+        'geometryType': 'LINESTRING',
+        'storageKind': 'postgis',
+        'srid': 4326,
+        'isPublic': true,
+        'defaultStyle': {'strokeColor': '#FF0055', 'strokeWidth': 4.0},
+        'legend': {'color': '#00AA00'},
+      });
 
-    expect(layer.displayColor, const Color(0xFFFF0055));
-    expect(layer.customStrokeColor, const Color(0xFFFF0055));
-    expect(layer.customStrokeWidth, 4.0);
-  });
+      expect(layer.displayColor, const Color(0xFFFF0055));
+      expect(layer.customStrokeColor, const Color(0xFFFF0055));
+      expect(layer.customStrokeWidth, 4.0);
+    },
+  );
 
   test('legend entries color takes precedence over default palette', () {
     final layer = LayerModel.fromJson({

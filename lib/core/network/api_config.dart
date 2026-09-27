@@ -24,9 +24,22 @@ class ApiConfig {
     'MAPBOX_STYLE_SATELLITE',
   );
   static const _defineWsUrl = String.fromEnvironment('WS_NOTIFICATIONS_URL');
+  static const _definePrivacyPolicyUrl = String.fromEnvironment(
+    'PRIVACY_POLICY_URL',
+  );
+  static const _defineTermsUrl = String.fromEnvironment('TERMS_URL');
 
   static String _value(String define, [String fallback = '']) =>
       define.isEmpty ? fallback : define;
+
+  static String get privacyPolicyUrl => _value(
+    _definePrivacyPolicyUrl,
+    'https://apicampha.tourismpj.pro.vn/privacy-policy',
+  );
+  static String get termsOfServiceUrl => _value(
+    _defineTermsUrl,
+    'https://apicampha.tourismpj.pro.vn/terms',
+  );
 
   static String get appName => _value(_defineAppName, 'GIS Cẩm Phả');
   static String get appVersion => _value(_defineAppVersion, '1.0.0');

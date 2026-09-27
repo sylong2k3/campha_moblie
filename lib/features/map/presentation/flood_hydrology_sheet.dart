@@ -123,6 +123,7 @@ class _FloodHydrologySheetState extends ConsumerState<FloodHydrologySheet> {
                     Text(run.periodText, style: theme.textTheme.bodySmall),
                   if (run.summary.isNotEmpty)
                     Card(
+                      margin: const EdgeInsets.only(top: 8, bottom: 12),
                       child: Padding(
                         padding: const EdgeInsets.all(14),
                         child: Column(
@@ -148,7 +149,9 @@ class _FloodHydrologySheetState extends ConsumerState<FloodHydrologySheet> {
                       ),
                     ),
                 ],
-                if (state.currentArtifacts.isNotEmpty)
+                if (state.currentArtifacts.isNotEmpty) ...[
+                  if (state.selectedRun?.summary.isEmpty ?? true)
+                    const SizedBox(height: 8),
                   Row(
                     children: [
                       Expanded(
@@ -165,6 +168,7 @@ class _FloodHydrologySheetState extends ConsumerState<FloodHydrologySheet> {
                       ),
                     ],
                   ),
+                ],
                 if (state.selectedRun != null &&
                     state.currentArtifacts.isEmpty &&
                     !state.loading)
@@ -180,11 +184,12 @@ class _FloodHydrologySheetState extends ConsumerState<FloodHydrologySheet> {
                 ])
                   if (state.currentArtifacts.any((a) => a.group == group)) ...[
                     Padding(
-                      padding: const EdgeInsets.only(top: 16, bottom: 6),
+                      padding: const EdgeInsets.only(top: 16, bottom: 8),
                       child: Text(
                         group,
                         style: theme.textTheme.titleSmall?.copyWith(
                           color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
@@ -192,6 +197,7 @@ class _FloodHydrologySheetState extends ConsumerState<FloodHydrologySheet> {
                       (a) => a.group == group,
                     ))
                       Card(
+                        margin: const EdgeInsets.only(bottom: 10),
                         clipBehavior: Clip.antiAlias,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,

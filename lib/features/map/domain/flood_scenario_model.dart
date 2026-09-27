@@ -47,12 +47,34 @@ class FloodScenarioModel {
       'Triều: ${_format(currentTide!)} m${_source(tideSource)}',
   ].join('\n');
 
+  LegendGroup? get legendGroup => layer?.legendGroup;
+  bool get hasValidLegend => layer?.hasValidLegend == true;
+
+  FloodScenarioModel copyWith({LayerModel? layer, bool clearLayer = false}) =>
+      FloodScenarioModel(
+        id: id,
+        code: code,
+        nameVi: nameVi,
+        layerCode: layerCode,
+        isActive: isActive,
+        minRainfall: minRainfall,
+        maxRainfall: maxRainfall,
+        minTide: minTide,
+        maxTide: maxTide,
+        description: description,
+        currentRainfall: currentRainfall,
+        rainfallSource: rainfallSource,
+        currentTide: currentTide,
+        tideSource: tideSource,
+        layer: clearLayer ? null : (layer ?? this.layer),
+      );
+
   factory FloodScenarioModel.fromJson(Map<String, dynamic> json) {
     LayerModel? parsedLayer;
     final layerJson = json['layer'];
-    if (layerJson is Map<String, dynamic>) {
+    if (layerJson is Map) {
       try {
-        parsedLayer = LayerModel.fromJson(layerJson);
+        parsedLayer = LayerModel.fromJson(Map<String, dynamic>.from(layerJson));
       } catch (_) {}
     }
 

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/router/app_router.dart';
+import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_motion.dart';
 import '../../../core/l10n/l10n.dart';
 import '../domain/session_controller.dart';
@@ -37,6 +38,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   String get _configuredTestAccountPassword =>
       widget.debugTestAccountPassword ?? _testAccountPassword;
+
+  String get _backDestination => guestReturnTo(widget.returnTo);
+
+  void _goBack() {
+    if (_submitting) return;
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      context.go(_backDestination);
+    }
+  }
 
   Future<void> _loginTestAccount(_TestAccount account) async {
     final password = _configuredTestAccountPassword;
@@ -104,179 +116,278 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return Scaffold(
-      body: AuthBackdrop(
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 440),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: AutofillGroup(
-                          child: Form(
-                            key: _formKey,
-                            autovalidateMode:
-                                AutovalidateMode.onUserInteraction,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                const Center(child: CivicBrand()),
-                                const SizedBox(height: 30),
-                                Text(
-                                  l10n.loginTitle,
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.headlineSmall,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  l10n.loginSubtitle,
-                                  style: Theme.of(context).textTheme.bodyMedium
-                                      ?.copyWith(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.onSurfaceVariant,
-                                      ),
-                                ),
-                                const SizedBox(height: 24),
-                                if (_error != null) ...[
-                                  ErrorBanner(error: _error!),
-                                  const SizedBox(height: 16),
-                                ],
-                                KeyedSubtree(
-                                  key: _emailKey,
-                                  child: TextFormField(
-                                    key: const ValueKey('login-email'),
-                                    controller: _emailController,
-                                    focusNode: _emailFocus,
-                                    enabled: !_submitting,
-                                    keyboardType: TextInputType.emailAddress,
-                                    textInputAction: TextInputAction.next,
-                                    autofillHints: const [
-                                      AutofillHints.username,
-                                      AutofillHints.email,
-                                    ],
-                                    autocorrect: false,
-                                    validator: (value) =>
-                                        emailError(l10n, value),
-                                    decoration: InputDecoration(
-                                      labelText: l10n.emailLabel,
-                                      prefixIcon: const Icon(
-                                        Icons.alternate_email,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 14),
-                                KeyedSubtree(
-                                  key: _passwordKey,
-                                  child: TextFormField(
-                                    key: const ValueKey('login-password'),
-                                    controller: _passwordController,
-                                    focusNode: _passwordFocus,
-                                    enabled: !_submitting,
-                                    obscureText: _obscurePassword,
-                                    textInputAction: TextInputAction.done,
-                                    autofillHints: const [
-                                      AutofillHints.password,
-                                    ],
-                                    validator: (value) =>
-                                        passwordError(l10n, value),
-                                    onFieldSubmitted: (_) => _submit(),
-                                    decoration: InputDecoration(
-                                      labelText: l10n.passwordLabel,
-                                      prefixIcon: const Icon(
-                                        Icons.lock_outline,
-                                      ),
-                                      suffixIcon: IconButton(
-                                        tooltip: _obscurePassword
-                                            ? l10n.showPassword
-                                            : l10n.hidePassword,
-                                        onPressed: () => setState(
-                                          () => _obscurePassword =
-                                              !_obscurePassword,
-                                        ),
-                                        icon: Icon(
-                                          _obscurePassword
-                                              ? Icons.visibility_outlined
-                                              : Icons.visibility_off_outlined,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: TextButton(
-                                    key: const ValueKey('forgot-password-link'),
-                                    onPressed: _submitting
-                                        ? null
-                                        : () => context.push(
-                                            '/auth/forgot-password',
-                                          ),
-                                    child: Text(l10n.forgotPasswordAction),
-                                  ),
-                                ),
-                                if (kDebugMode || _testLoginEnabled) ...[
-                                  _TestAccountsStrip(
-                                    enabled: !_submitting,
-                                    passwordConfigured:
-                                        _configuredTestAccountPassword
-                                            .isNotEmpty,
-                                    onSelected: _loginTestAccount,
-                                  ),
-                                  const SizedBox(height: 14),
-                                ] else
-                                  const SizedBox(height: 6),
-                                FilledButton(
-                                  key: const ValueKey('login-submit'),
-                                  onPressed: _submitting ? null : _submit,
-                                  child: SubmitLabel(
-                                    busy: _submitting,
-                                    label: l10n.loginAction,
-                                  ),
-                                ),
-                                const SizedBox(height: 14),
-                                OutlinedButton(
-                                  key: const ValueKey('guest-continue'),
-                                  onPressed: _submitting
-                                      ? null
-                                      : () => context.go(
-                                          guestReturnTo(widget.returnTo),
-                                        ),
-                                  child: Text(l10n.continueAsGuest),
-                                ),
-                                const SizedBox(height: 20),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Flexible(child: Text(l10n.noAccount)),
-                                    TextButton(
-                                      onPressed: _submitting
-                                          ? null
-                                          : () =>
-                                                context.push('/auth/register'),
-                                      child: Text(l10n.registerAction),
-                                    ),
-                                  ],
-                                ),
-                              ],
+    return PopScope(
+      canPop: Navigator.of(context).canPop(),
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) context.go(_backDestination);
+      },
+      child: Scaffold(
+        body: AuthBackdrop(
+          child: SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: TextButton.icon(
+                          key: const ValueKey('login-back'),
+                          onPressed: _submitting ? null : _goBack,
+                          icon: const Icon(Icons.arrow_back_rounded),
+                          label: Text(l10n.reportBack),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerLowest,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.outlineVariant.withValues(alpha: 0.5),
+                          ),
+                          boxShadow: AppColors.cardElevatedShadow(
+                            Theme.of(context).brightness,
+                          ),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(28),
+                          child: AutofillGroup(
+                            child: Form(
+                              key: _formKey,
+                              autovalidateMode:
+                                  AutovalidateMode.onUserInteraction,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  const Center(child: CivicBrand()),
+                                  const SizedBox(height: 32),
+                                  Text(
+                                    l10n.loginTitle,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .headlineSmall
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: -0.3,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    l10n.loginSubtitle,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurfaceVariant,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 28),
+                                  if (_error != null) ...[
+                                    ErrorBanner(error: _error!),
+                                    const SizedBox(height: 18),
+                                  ],
+                                  KeyedSubtree(
+                                    key: _emailKey,
+                                    child: TextFormField(
+                                      key: const ValueKey('login-email'),
+                                      controller: _emailController,
+                                      focusNode: _emailFocus,
+                                      enabled: !_submitting,
+                                      keyboardType: TextInputType.emailAddress,
+                                      textInputAction: TextInputAction.next,
+                                      autofillHints: const [
+                                        AutofillHints.username,
+                                        AutofillHints.email,
+                                      ],
+                                      autocorrect: false,
+                                      validator: (value) =>
+                                          emailError(l10n, value),
+                                      decoration: InputDecoration(
+                                        labelText: l10n.emailLabel,
+                                        prefixIcon: const Icon(
+                                          Icons.alternate_email,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  KeyedSubtree(
+                                    key: _passwordKey,
+                                    child: TextFormField(
+                                      key: const ValueKey('login-password'),
+                                      controller: _passwordController,
+                                      focusNode: _passwordFocus,
+                                      enabled: !_submitting,
+                                      obscureText: _obscurePassword,
+                                      textInputAction: TextInputAction.done,
+                                      autofillHints: const [
+                                        AutofillHints.password,
+                                      ],
+                                      validator: (value) =>
+                                          passwordError(l10n, value),
+                                      onFieldSubmitted: (_) => _submit(),
+                                      decoration: InputDecoration(
+                                        labelText: l10n.passwordLabel,
+                                        prefixIcon: const Icon(
+                                          Icons.lock_outline,
+                                        ),
+                                        suffixIcon: IconButton(
+                                          tooltip: _obscurePassword
+                                              ? l10n.showPassword
+                                              : l10n.hidePassword,
+                                          onPressed: () => setState(
+                                            () => _obscurePassword =
+                                                !_obscurePassword,
+                                          ),
+                                          icon: Icon(
+                                            _obscurePassword
+                                                ? Icons.visibility_outlined
+                                                : Icons.visibility_off_outlined,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: TextButton(
+                                      key: const ValueKey(
+                                        'forgot-password-link',
+                                      ),
+                                      onPressed: _submitting
+                                          ? null
+                                          : () => context.push(
+                                              '/auth/forgot-password',
+                                            ),
+                                      child: Text(l10n.forgotPasswordAction),
+                                    ),
+                                  ),
+                                  if (kDebugMode || _testLoginEnabled) ...[
+                                    _TestAccountsStrip(
+                                      enabled: !_submitting,
+                                      passwordConfigured:
+                                          _configuredTestAccountPassword
+                                              .isNotEmpty,
+                                      onSelected: _loginTestAccount,
+                                    ),
+                                    const SizedBox(height: 16),
+                                  ] else
+                                    const SizedBox(height: 8),
+                                  _GradientLoginButton(
+                                    onPressed: _submitting ? null : _submit,
+                                    submitting: _submitting,
+                                    label: l10n.loginAction,
+                                  ),
+                                  const SizedBox(height: 14),
+                                  OutlinedButton(
+                                    key: const ValueKey('guest-continue'),
+                                    onPressed: _submitting
+                                        ? null
+                                        : () => context.go(_backDestination),
+                                    child: Text(l10n.continueAsGuest),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Flexible(child: Text(l10n.noAccount)),
+                                      TextButton(
+                                        onPressed: _submitting
+                                            ? null
+                                            : () => context.push(
+                                                '/auth/register',
+                                              ),
+                                        child: Text(l10n.registerAction),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Nút đăng nhập nổi bật với màu primary.
+class _GradientLoginButton extends StatelessWidget {
+  const _GradientLoginButton({
+    required this.onPressed,
+    required this.submitting,
+    required this.label,
+  });
+
+  final VoidCallback? onPressed;
+  final bool submitting;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      height: 52,
+      decoration: BoxDecoration(
+        color: onPressed != null
+            ? colors.primary
+            : colors.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: const ValueKey('login-submit'),
+          borderRadius: BorderRadius.circular(16),
+          onTap: onPressed,
+          child: Center(
+            child: submitting
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : Text(
+                    label,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
           ),
         ),
       ),
@@ -357,8 +468,20 @@ class _TestAccountsStrip extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.badge_outlined, size: 18, color: colors.primary),
-              const SizedBox(width: 6),
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: colors.primaryContainer,
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: Icon(
+                  Icons.badge_outlined,
+                  size: 14,
+                  color: colors.onPrimaryContainer,
+                ),
+              ),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Tài khoản mẫu trải nghiệm',
@@ -368,16 +491,9 @@ class _TestAccountsStrip extends StatelessWidget {
                   ),
                 ),
               ),
-              Text(
-                'Kéo ngang',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: colors.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           SingleChildScrollView(
             key: const ValueKey('test-accounts-scroll'),
             scrollDirection: Axis.horizontal,
@@ -386,33 +502,16 @@ class _TestAccountsStrip extends StatelessWidget {
                 for (final account in _testAccounts)
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
-                    child: Tooltip(
-                      message: account.email,
-                      child: OutlinedButton.icon(
-                        key: ValueKey('test-account-${account.roleCode}'),
-                        onPressed: enabled ? () => onSelected(account) : null,
-                        style: OutlinedButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                          backgroundColor: colors.primaryContainer.withValues(
-                            alpha: 0.28,
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                        ),
-                        icon: Icon(account.icon, size: 18),
-                        label: Text(
-                          _testRoleLabel(context.l10n, account.roleCode),
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                      ),
+                    child: _TestAccountChip(
+                      account: account,
+                      enabled: enabled,
+                      onTap: () => onSelected(account),
                     ),
                   ),
               ],
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Row(
             children: [
               Icon(
@@ -437,6 +536,68 @@ class _TestAccountsStrip extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TestAccountChip extends StatelessWidget {
+  const _TestAccountChip({
+    required this.account,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final _TestAccount account;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: account.email,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: ValueKey('test-account-${account.roleCode}'),
+          onTap: enabled ? onTap : null,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: colors.primaryContainer.withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: colors.primary.withValues(alpha: 0.15)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: colors.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(account.icon, size: 16, color: colors.primary),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    _testRoleLabel(context.l10n, account.roleCode),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: colors.onSurface,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

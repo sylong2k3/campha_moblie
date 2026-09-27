@@ -19,7 +19,11 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' hide Size;
 
 import 'support/memory_secure_storage.dart';
 
-LayerModel _layer(String geometry, Map<String, dynamic> style) => LayerModel(
+LayerModel _layer(
+  String geometry,
+  Map<String, dynamic> style, {
+  String? geoserverLayer,
+}) => LayerModel(
   id: '1',
   code: 'test_layer',
   nameVi: 'Test layer',
@@ -29,6 +33,7 @@ LayerModel _layer(String geometry, Map<String, dynamic> style) => LayerModel(
   srid: 4326,
   isPublic: true,
   legend: const {},
+  geoserverLayer: geoserverLayer,
   defaultStyle: style,
 );
 
@@ -53,15 +58,29 @@ class _Scenarios extends FloodScenarioController {
 
 class _Style extends Fake implements StyleManager {
   final layers = <String, Map<String, dynamic>>{};
+  final sources = <String, Map<String, dynamic>>{};
   int sourceAdds = 0;
   int layerAdds = 0;
   int updates = 0;
   int layerChecks = 0;
   int invalidUpdates = 0;
+  bool loaded = false;
+  int readinessChecks = 0;
+  int localizations = 0;
+  Future<bool> Function()? onIsStyleLoaded;
   Future<bool> Function(String)? onLayerExists;
   Future<void> Function()? onAddSource;
   @override
-  Future<void> localizeLabels(String locale, List<String>? ids) async {}
+  Future<bool> isStyleLoaded() async {
+    readinessChecks++;
+    return onIsStyleLoaded == null ? loaded : await onIsStyleLoaded!();
+  }
+
+  @override
+  Future<void> localizeLabels(String locale, List<String>? ids) async {
+    localizations++;
+  }
+
   @override
   Future<bool> styleLayerExists(String id) async {
     layerChecks++;
@@ -73,6 +92,7 @@ class _Style extends Fake implements StyleManager {
   @override
   Future<void> addStyleSource(String id, String properties) async {
     sourceAdds++;
+    sources[id] = jsonDecode(properties) as Map<String, dynamic>;
     await onAddSource?.call();
   }
 
@@ -100,7 +120,9 @@ class _Style extends Fake implements StyleManager {
   }
 
   @override
-  Future<void> removeStyleSource(String id) async {}
+  Future<void> removeStyleSource(String id) async {
+    sources.remove(id);
+  }
 }
 
 class _Http extends Fake implements MapboxHttpService {
@@ -196,7 +218,198 @@ Future<void> _loadStyle(WidgetTester tester, MapWidget widget) async {
   await tester.pump(const Duration(milliseconds: 300));
 }
 
+Future<void> _loadMap(WidgetTester tester, MapWidget widget) async {
+  widget.onMapLoadedListener!(
+    MapLoadedEventData.fromJson({
+      'timeInterval': {'begin': 0, 'end': 1},
+    }),
+  );
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
+}
+
 void main() {
+  for (final earlyStyleEvent in [false, true]) {
+    testWidgets(
+      'recovers native style at creation (early event: $earlyStyleEvent)',
+      (tester) async {
+        final catalog = _Catalog(_layer('POINT', {}));
+        final widget = await _pumpMap(
+          tester,
+          catalog,
+          MapRepository(dio: Dio()),
+        );
+        if (earlyStyleEvent) await _loadStyle(tester, widget);
+        final map = _Map();
+        map.style.loaded = true;
+        widget.onMapCreated!(map);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(map.style.layers, contains('mvt-style-1'));
+        expect(map.style.readinessChecks, 1);
+        expect(map.style.localizations, 1);
+        expect(map.style.sourceAdds, 1);
+        expect(map.style.layerAdds, 1);
+        expect(tester.takeException(), isNull);
+      },
+      variant: TargetPlatformVariant({TargetPlatform.windows}),
+    );
+  }
+
+  testWidgets('map-loaded recovers a missed style callback only once', (
+    tester,
+  ) async {
+    final catalog = _Catalog(_layer('POINT', {}));
+    final widget = await _pumpMap(tester, catalog, MapRepository(dio: Dio()));
+    final map = _Map();
+    widget.onMapCreated!(map);
+    await tester.pump();
+    expect(map.style.sourceAdds, 0);
+    map.style.loaded = true;
+    await _loadMap(tester, widget);
+    await _loadMap(tester, widget);
+
+    expect(map.style.layers, contains('mvt-style-1'));
+    expect(map.style.readinessChecks, 2);
+    expect(map.style.localizations, 1);
+    expect(map.style.sourceAdds, 1);
+    expect(map.style.layerAdds, 1);
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant({TargetPlatform.windows}));
+
+  testWidgets('map-loaded cannot mark an unloaded native style ready', (
+    tester,
+  ) async {
+    final catalog = _Catalog(_layer('POINT', {}));
+    final widget = await _pumpMap(tester, catalog, MapRepository(dio: Dio()));
+    final map = _Map();
+    widget.onMapCreated!(map);
+    await tester.pump();
+    await _loadMap(tester, widget);
+    catalog.setLayerOpacity('1', 0.5);
+    await tester.pump();
+
+    expect(map.style.readinessChecks, 2);
+    expect(map.style.layerChecks, 0);
+    expect(map.style.sourceAdds, 0);
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant({TargetPlatform.windows}));
+
+  testWidgets('normal style event wins over a pending recovery query', (
+    tester,
+  ) async {
+    final catalog = _Catalog(_layer('POINT', {}));
+    final widget = await _pumpMap(tester, catalog, MapRepository(dio: Dio()));
+    final pending = Completer<bool>();
+    final map = _Map();
+    map.style.onIsStyleLoaded = () => pending.future;
+    widget.onMapCreated!(map);
+    await tester.pump();
+    expect(map.style.readinessChecks, 1);
+    await _loadStyle(tester, widget);
+    pending.complete(true);
+    await tester.pump();
+    await _loadMap(tester, widget);
+
+    expect(map.style.localizations, 1);
+    expect(map.style.sourceAdds, 1);
+    expect(map.style.layerAdds, 1);
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant({TargetPlatform.windows}));
+
+  testWidgets('overlapping readiness probes initialize style only once', (
+    tester,
+  ) async {
+    final catalog = _Catalog(_layer('POINT', {}));
+    final widget = await _pumpMap(tester, catalog, MapRepository(dio: Dio()));
+    final pending = Completer<bool>();
+    final map = _Map();
+    map.style.onIsStyleLoaded = () => pending.future;
+    widget.onMapCreated!(map);
+    await tester.pump();
+    await _loadMap(tester, widget);
+    expect(map.style.readinessChecks, 2);
+    pending.complete(true);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(map.style.localizations, 1);
+    expect(map.style.sourceAdds, 1);
+    expect(map.style.layerAdds, 1);
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant({TargetPlatform.windows}));
+
+  for (final failPending in [false, true]) {
+    for (final replaceMap in [false, true]) {
+      testWidgets(
+        'stale readiness ignored (replace map: $replaceMap, error: $failPending)',
+        (tester) async {
+          final catalog = _Catalog(_layer('POINT', {}));
+          final widget = await _pumpMap(
+            tester,
+            catalog,
+            MapRepository(dio: Dio()),
+          );
+          final pending = Completer<bool>();
+          final oldMap = _Map();
+          oldMap.style.onIsStyleLoaded = () => pending.future;
+          widget.onMapCreated!(oldMap);
+          await tester.pump();
+          expect(oldMap.style.readinessChecks, 1);
+          final newMap = _Map();
+          if (replaceMap) {
+            widget.onMapCreated!(newMap);
+            await tester.pump();
+          } else {
+            await tester.pumpWidget(const SizedBox.shrink());
+          }
+          if (failPending) {
+            pending.completeError(PlatformException(code: 'channel-error'));
+          } else {
+            pending.complete(true);
+          }
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 300));
+
+          expect(oldMap.style.localizations, 0);
+          expect(oldMap.style.sourceAdds, 0);
+          expect(newMap.style.sourceAdds, 0);
+          expect(tester.takeException(), isNull);
+          if (replaceMap) {
+            await _loadStyle(tester, widget);
+            expect(newMap.style.layers, contains('mvt-style-1'));
+            expect(find.text('Một lớp bản đồ chưa tải được'), findsNothing);
+          }
+        },
+        variant: TargetPlatformVariant({TargetPlatform.windows}),
+      );
+    }
+  }
+
+  testWidgets('style recovery preserves an explicitly empty layer selection', (
+    tester,
+  ) async {
+    final catalog = _Catalog(_layer('POINT', {}));
+    final widget = await _pumpMap(tester, catalog, MapRepository(dio: Dio()));
+    catalog.disableAll();
+    await tester.pump();
+    final map = _Map();
+    map.style.loaded = true;
+    widget.onMapCreated!(map);
+    await tester.pump();
+    await _loadMap(tester, widget);
+
+    expect(map.style.localizations, 1);
+    expect(catalog.state.activeLayerIds, isEmpty);
+    expect(map.style.sourceAdds, 0);
+    catalog.setLayerVisible('1', true);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(map.style.layers, contains('mvt-style-1'));
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant({TargetPlatform.windows}));
+
   testWidgets('channel error stays handled and retry refreshes style', (
     tester,
   ) async {
@@ -434,4 +647,89 @@ void main() {
       expect(tester.takeException(), isNull);
     }, variant: TargetPlatformVariant({TargetPlatform.windows}));
   }
+
+  testWidgets(
+    'renders uncolored vector layer with geoserverLayer via GeoServer WMS default style',
+    (tester) async {
+      final catalog = _Catalog(
+        _layer('LINESTRING', {}, geoserverLayer: 'campha:ranhgioi_campha'),
+      );
+      final repository = MapRepository(dio: Dio());
+      final widget = await _pumpMap(tester, catalog, repository);
+      final map = _Map();
+      widget.onMapCreated!(map);
+      await tester.pump();
+      await _loadStyle(tester, widget);
+
+      expect(map.style.layers, contains('raster-style-1'));
+      expect(map.style.layers, isNot(contains('mvt-style-1')));
+      expect(map.style.sources, contains('raster-1'));
+      final sourceProps = map.style.sources['raster-1']!;
+      final tileUrl = (sourceProps['tiles'] as List).first as String;
+      expect(tileUrl, contains('service=WMS'));
+      expect(tileUrl, contains('styles='));
+      expect(tileUrl, contains('layers=campha%3Aranhgioi_campha'));
+      final card = tester.widget<LayerLegendCard>(find.byType(LayerLegendCard));
+      expect(card.items.single.color, const Color(0xFF0000FF));
+      expect(card.items.single.label, 'Test layer');
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant({TargetPlatform.windows}),
+  );
+
+  testWidgets('vector layer with apiColor stays on MVT and applies color', (
+    tester,
+  ) async {
+    final catalog = _Catalog(
+      _layer('LINESTRING', {
+        'strokeColor': '#11FF00',
+      }, geoserverLayer: 'campha:duong_ranh_gioi'),
+    );
+    final repository = MapRepository(dio: Dio());
+    final widget = await _pumpMap(tester, catalog, repository);
+    final map = _Map();
+    widget.onMapCreated!(map);
+    await tester.pump();
+    await _loadStyle(tester, widget);
+
+    expect(map.style.layers, contains('mvt-style-1'));
+    expect(map.style.layers, isNot(contains('raster-style-1')));
+    final paint = map.style.layers['mvt-style-1']!['paint'] as Map;
+    expect((paint['line-color'] as String).toRGBAInt(), 0xFF11FF00);
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant({TargetPlatform.windows}));
+
+  testWidgets(
+    'switching between GeoServer WMS and colored MVT cleans up old renderer',
+    (tester) async {
+      final catalog = _Catalog(
+        _layer('LINESTRING', {}, geoserverLayer: 'campha:ranhgioi_campha'),
+      );
+      final repository = MapRepository(dio: Dio());
+      final widget = await _pumpMap(tester, catalog, repository);
+      final map = _Map();
+      widget.onMapCreated!(map);
+      await tester.pump();
+      await _loadStyle(tester, widget);
+
+      expect(map.style.layers, contains('raster-style-1'));
+      expect(map.style.sources, contains('raster-1'));
+
+      // Switch to colored MVT
+      catalog.refresh(
+        _layer('LINESTRING', {
+          'strokeColor': '#11FF00',
+        }, geoserverLayer: 'campha:ranhgioi_campha'),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(map.style.layers, contains('mvt-style-1'));
+      expect(map.style.layers, isNot(contains('raster-style-1')));
+      expect(map.style.sources, contains('mvt-1'));
+      expect(map.style.sources, isNot(contains('raster-1')));
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant({TargetPlatform.windows}),
+  );
 }

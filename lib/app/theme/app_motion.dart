@@ -39,4 +39,57 @@ abstract final class AppMotion {
       ),
     );
   }
+
+  /// Tạo delay cho hiệu ứng cascade khi danh sách item xuất hiện lần lượt.
+  /// [index]: vị trí của item trong danh sách.
+  /// Returns Duration delay phù hợp (tối đa ~400ms tại index 8).
+  static Duration staggerDelay(int index) =>
+      Duration(milliseconds: (index.clamp(0, 8) * 50));
+
+  /// Animation builder cho item xuất hiện cascade: fade + slide lên.
+  /// Dùng trong `AnimatedList` hoặc custom `TweenAnimationBuilder`.
+  static Widget staggeredEntrance({
+    required Widget child,
+    required int index,
+    required bool animate,
+  }) {
+    if (!animate) return child;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: surface + staggerDelay(index),
+      curve: surfaceCurve,
+      builder: (context, value, child) {
+        if (disabled(context)) return child!;
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 12 * (1 - value)),
+            child: child,
+          ),
+        );
+      },
+      child: child,
+    );
+  }
+
+  /// Scale-in animation cho FAB, badge, hoặc phần tử popup.
+  static Widget scaleIn({
+    required Widget child,
+    Duration? duration,
+  }) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.6, end: 1),
+      duration: duration ?? state,
+      curve: emphasizedCurve,
+      builder: (context, value, child) {
+        if (disabled(context)) return child!;
+        return Opacity(
+          opacity: value.clamp(0, 1),
+          child: Transform.scale(scale: value, child: child),
+        );
+      },
+      child: child,
+    );
+  }
 }
+

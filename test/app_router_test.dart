@@ -2,10 +2,12 @@ import 'package:campha_moblie/app/router/app_router.dart';
 import 'package:campha_moblie/app/router/route_names.dart';
 import 'package:campha_moblie/features/auth/domain/session_controller.dart';
 import 'package:campha_moblie/features/auth/domain/user_model.dart';
+import 'package:campha_moblie/features/auth/presentation/login_screen.dart';
 import 'package:campha_moblie/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 void main() {
   test('allows only known local return routes', () {
@@ -69,11 +71,58 @@ void main() {
     expect(sanitizeReturnTo(null), isNull);
   });
 
+  testWidgets('login back pops to the page that pushed login', (tester) async {
+    final router = _loginBackRouter(initialLocation: '/source');
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(_routerApp(router));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('source-open-login')));
+    await tester.pumpAndSettle();
+    expect(router.state.uri.path, RoutePaths.login);
+
+    await tester.tap(find.byKey(const ValueKey('login-back')));
+    await tester.pumpAndSettle();
+    expect(router.state.uri.path, '/source');
+  });
+
+  testWidgets('login back uses safe return target without history', (
+    tester,
+  ) async {
+    final router = _loginBackRouter(
+      initialLocation:
+          '${RoutePaths.login}?returnTo=${Uri.encodeQueryComponent(RoutePaths.reportCreate)}',
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(_routerApp(router));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('login-back')));
+    await tester.pumpAndSettle();
+
+    expect(router.state.uri.path, RoutePaths.reports);
+  });
+
+  testWidgets('system back uses safe return target without history', (
+    tester,
+  ) async {
+    final router = _loginBackRouter(
+      initialLocation:
+          '${RoutePaths.login}?returnTo=${Uri.encodeQueryComponent(RoutePaths.reportCreate)}',
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(_routerApp(router));
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(router.state.uri.path, RoutePaths.reports);
+  });
+
   testWidgets('push to report detail from notifications', (tester) async {
     final container = ProviderContainer(
-      overrides: [
-        sessionControllerProvider.overrideWith(_Session.new),
-      ],
+      overrides: [sessionControllerProvider.overrideWith(_Session.new)],
     );
     addTearDown(container.dispose);
     final router = container.read(appRouterProvider);
@@ -104,13 +153,50 @@ void main() {
   });
 }
 
+GoRouter _loginBackRouter({required String initialLocation}) => GoRouter(
+  initialLocation: initialLocation,
+  routes: [
+    GoRoute(
+      path: '/source',
+      builder: (context, state) => Scaffold(
+        body: TextButton(
+          key: const ValueKey('source-open-login'),
+          onPressed: () => context.push(
+            '${RoutePaths.login}?returnTo=${Uri.encodeQueryComponent(RoutePaths.reportCreate)}',
+          ),
+          child: const Text('Open login'),
+        ),
+      ),
+    ),
+    GoRoute(
+      path: RoutePaths.login,
+      builder: (context, state) => LoginScreen(
+        returnTo: sanitizeReturnTo(state.uri.queryParameters['returnTo']),
+      ),
+    ),
+    GoRoute(
+      path: RoutePaths.reports,
+      builder: (context, state) => const Scaffold(body: Text('Reports')),
+    ),
+  ],
+);
+
+Widget _routerApp(GoRouter router) => ProviderScope(
+  child: MaterialApp.router(
+    routerConfig: router,
+    locale: const Locale('vi'),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+  ),
+);
+
 class _Session extends SessionController {
   @override
   SessionState build() => SessionState.authenticated(
-        UserModel.fromJson({
-          'id': '1',
-          'email': 'admin@campha.gov.vn',
-          'role': {'code': 'system_admin'},
-        }),
-      );
+    UserModel.fromJson({
+      'id': '1',
+      'email': 'admin@campha.gov.vn',
+      'role': {'code': 'system_admin'},
+    }),
+  );
 }
