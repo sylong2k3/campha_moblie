@@ -35,7 +35,8 @@ void main() {
     }
 
     await tester.tap(find.byIcon(Icons.person_outline_rounded));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 350));
     expect(find.text('Khám phá với tư cách khách'), findsOneWidget);
     expect(find.byKey(const ValueKey('profile-login')), findsOneWidget);
   });
