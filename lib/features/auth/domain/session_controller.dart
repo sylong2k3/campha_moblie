@@ -11,7 +11,6 @@ import '../../feature_edit/data/offline_edit_queue.dart';
 import '../../feature_edit/domain/feature_sync_controller.dart';
 import '../../field_reports/domain/field_reports_controller.dart';
 import '../../field_reports/domain/report_composer_controller.dart';
-import '../../map/domain/map_controller.dart';
 import '../../notifications/domain/notification_controller.dart';
 import '../../tools/domain/field_tools_controller.dart';
 import '../data/auth_repository.dart';
@@ -153,10 +152,14 @@ class SessionController extends Notifier<SessionState> {
   }
 
   Future<void> logout() async {
+    if (_cleaningSession) return;
     final ownerId = state.user?.id;
     _ownerQueue = ownerId == null
         ? null
         : ref.read(offlineEditQueueProvider.future);
+    // Repository xóa token trước khi trả về; callback chỉ đổi trạng thái,
+    // không chạy thêm một lượt dọn dữ liệu song song với finally bên dưới.
+    _cleaningSession = true;
     try {
       await ref.read(appPushCoordinatorProvider).unregisterDevice();
     } catch (_) {
@@ -172,10 +175,12 @@ class SessionController extends Notifier<SessionState> {
   }
 
   Future<void> deleteAccount() async {
+    if (_cleaningSession) return;
     final ownerId = state.user?.id;
     _ownerQueue = ownerId == null
         ? null
         : ref.read(offlineEditQueueProvider.future);
+    _cleaningSession = true;
     try {
       await ref.read(appPushCoordinatorProvider).unregisterDevice();
     } catch (_) {
@@ -244,7 +249,6 @@ class SessionController extends Notifier<SessionState> {
       () => ref.invalidate(featureSyncProvider),
       () => ref.invalidate(documentListProvider),
       () => ref.invalidate(pdfMapListProvider),
-      () => ref.invalidate(mapCatalogProvider),
       () => ref.invalidate(notificationListControllerProvider),
       () => ref.invalidate(unreadNotificationCountProvider),
       () => ref.read(fieldReportsProvider.notifier).clearSensitiveState(),

@@ -9,6 +9,10 @@ import 'package:campha_moblie/core/network/interceptors/logging_interceptor.dart
 
 void main() {
   group('release config validation', () {
+    test('compiled runtime configuration is valid for release', () {
+      expect(ApiConfig.validateForRelease(), isNull);
+    });
+
     test('accepts HTTPS API and optional WSS/public client values', () {
       expect(
         ApiConfig.validateForRelease(

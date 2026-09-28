@@ -44,10 +44,7 @@ class FeatureDetailScreen extends ConsumerWidget {
         .layers
         .where((item) => item.id == layerId)
         .firstOrNull;
-    final editable =
-        user?.roleCode == 'so_tnmt' &&
-        user!.hasPermission('map_feature', 'update') &&
-        layer?.canEdit == true;
+    final editable = user?.canEditMapFeatures == true && layer?.canEdit == true;
     return Scaffold(
       appBar: AppBar(
         title: Text(context.l10n.mapFeatureTitle),

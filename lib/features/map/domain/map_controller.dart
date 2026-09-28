@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_config.dart';
+import '../../auth/domain/session_controller.dart';
 import '../data/map_repository.dart';
 import 'layer_model.dart';
 
@@ -70,6 +71,15 @@ class MapCatalogController extends Notifier<MapCatalogState> {
     ref.onDispose(() {
       _disposed = true;
       _generation++;
+    });
+    ref.listen<SessionState>(sessionControllerProvider, (previous, next) {
+      if (previous != null &&
+          !next.isBootstrapping &&
+          (previous.user?.id != next.user?.id ||
+              previous.isAuthenticated != next.isAuthenticated ||
+              previous.user?.roleCode != next.user?.roleCode)) {
+        resetForIdentityChange();
+      }
     });
     Future.microtask(load);
     return const MapCatalogState(loading: true);
@@ -143,8 +153,9 @@ class MapCatalogController extends Notifier<MapCatalogState> {
         basemaps: basemaps,
         activeLayerIds: defaultActive,
         selectedBasemapCode:
-            state.selectedBasemapCode ??
-            (basemaps.isEmpty ? null : basemaps.first.code),
+            basemaps.any((b) => b.code == state.selectedBasemapCode)
+            ? state.selectedBasemapCode
+            : (basemaps.isEmpty ? null : basemaps.first.code),
         loading: false,
         stale: false,
         clearError: true,
@@ -161,11 +172,23 @@ class MapCatalogController extends Notifier<MapCatalogState> {
 
   void resetForIdentityChange() {
     _generation++;
-    if (state.layers.isNotEmpty || state.basemaps.isNotEmpty) {
-      state = state.copyWith(loading: true, stale: true);
-    } else {
-      state = const MapCatalogState(loading: true);
-    }
+    ref.read(mapRepositoryProvider).clearTileTickets();
+    // Giữ nền/vị trí/lựa chọn công khai; dữ liệu riêng tư không được chờ API
+    // mới xóa vì request có thể chậm hoặc thất bại khi đăng xuất.
+    final publicLayers = state.layers.where((layer) => layer.isPublic).toList();
+    final publicIds = publicLayers.map((layer) => layer.id).toSet();
+    state = state.copyWith(
+      layers: publicLayers,
+      activeLayerIds: state.activeLayerIds.intersection(publicIds),
+      opacityByLayer: Map.fromEntries(
+        state.opacityByLayer.entries.where(
+          (entry) => publicIds.contains(entry.key),
+        ),
+      ),
+      loading: true,
+      stale: publicLayers.isNotEmpty,
+      clearError: true,
+    );
     Future.microtask(load);
   }
 

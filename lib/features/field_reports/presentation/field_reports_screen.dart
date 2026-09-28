@@ -19,6 +19,8 @@ import '../../shared/presentation/app_feedback.dart';
 import '../../tools/domain/field_tools_models.dart';
 import '../domain/field_report_models.dart';
 import '../domain/field_reports_controller.dart';
+import 'admin_report_sheets.dart';
+import 'report_status.dart';
 
 class FieldReportsScreen extends ConsumerStatefulWidget {
   const FieldReportsScreen({super.key});
@@ -30,7 +32,6 @@ typedef _NearbySelection = ({DateTime from, DateTime to, int radius});
 
 class _FieldReportsScreenState extends ConsumerState<FieldReportsScreen>
     with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
-  bool _mapMode = false;
   bool _nearbyPending = false;
 
   /// Lựa chọn đang dang dở khi người dùng được đưa sang Cài đặt hệ thống —
@@ -148,7 +149,6 @@ class _FieldReportsScreenState extends ConsumerState<FieldReportsScreen>
     }
   }
 
-
   Future<void> _showLocationRecovery(
     String message,
     Future<bool> Function() openSettings,
@@ -181,6 +181,21 @@ class _FieldReportsScreenState extends ConsumerState<FieldReportsScreen>
     }
   }
 
+  void _openReport(FieldReport report) {
+    final access = ref.read(fieldReportAccessProvider);
+    final admin = ref.read(fieldReportsProvider).admin;
+    if ((admin && !access.canRead) || (!admin && !report.isPublic)) return;
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => admin
+          ? AdminReportSheet(reportId: report.id)
+          : _PublicReportSheet(report: report),
+    );
+  }
+
   void _openProtected(String path) {
     final authenticated = ref.read(sessionControllerProvider).isAuthenticated;
     context.go(
@@ -194,6 +209,8 @@ class _FieldReportsScreenState extends ConsumerState<FieldReportsScreen>
   Widget build(BuildContext context) {
     super.build(context);
     final state = ref.watch(fieldReportsProvider);
+    final access = ref.watch(fieldReportAccessProvider);
+    final mapMode = state.mapMode;
     final items = _effectiveItems(state);
     final l10n = context.l10n;
     final colors = Theme.of(context).colorScheme;
@@ -209,7 +226,7 @@ class _FieldReportsScreenState extends ConsumerState<FieldReportsScreen>
         onRefresh: ref.read(fieldReportsProvider.notifier).refresh,
         child: CustomScrollView(
           key: const ValueKey('field-reports-scroll'),
-          physics: _mapMode
+          physics: mapMode
               ? const NeverScrollableScrollPhysics()
               : const AlwaysScrollableScrollPhysics(),
           slivers: [
@@ -222,7 +239,7 @@ class _FieldReportsScreenState extends ConsumerState<FieldReportsScreen>
               surfaceTintColor: Colors.transparent,
               titleSpacing: 20,
               title: Text(
-                l10n.reportsTitle,
+                state.admin ? l10n.reportAdminView : l10n.reportsTitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(
@@ -248,24 +265,73 @@ class _FieldReportsScreenState extends ConsumerState<FieldReportsScreen>
                 collapseMode: CollapseMode.pin,
                 background: _ReportsHero(
                   appName: l10n.appTitle,
-                  subtitle: l10n.reportsSubtitle,
+                  subtitle: state.admin
+                      ? l10n.reportAdminSubtitle
+                      : l10n.reportsSubtitle,
                 ),
               ),
             ),
+            if (access.canRead)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ChoiceChip(
+                        key: const ValueKey('report-scope-admin'),
+                        avatar: const Icon(
+                          Icons.admin_panel_settings_outlined,
+                          size: 18,
+                        ),
+                        label: Text(l10n.reportAdminView),
+                        selected: state.admin,
+                        onSelected: (_) => ref
+                            .read(fieldReportsProvider.notifier)
+                            .setAdminView(true),
+                      ),
+                      ChoiceChip(
+                        key: const ValueKey('report-scope-public'),
+                        avatar: const Icon(Icons.public, size: 18),
+                        label: Text(l10n.reportPublicView),
+                        selected: !state.admin,
+                        onSelected: (_) => ref
+                            .read(fieldReportsProvider.notifier)
+                            .setAdminView(false),
+                      ),
+                      if (access.canStats && state.admin)
+                        ActionChip(
+                          key: const ValueKey('report-clusters-action'),
+                          avatar: const Icon(Icons.hub_outlined, size: 18),
+                          label: Text(l10n.reportClustersTitle),
+                          onPressed: () => showModalBottomSheet<void>(
+                            context: context,
+                            isScrollControlled: true,
+                            useSafeArea: true,
+                            showDragHandle: true,
+                            builder: (_) => const ReportClustersSheet(),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                 child: _ReportViewToggle(
                   key: const ValueKey('report-view-segment'),
-                  mapMode: _mapMode,
+                  mapMode: mapMode,
                   listLabel: l10n.reportListView,
                   mapLabel: l10n.reportMapView,
-                  onChanged: (value) => setState(() => _mapMode = value),
+                  onChanged: ref.read(fieldReportsProvider.notifier).setMapMode,
                 ),
               ),
             ),
             SliverToBoxAdapter(
               child: _ReportFilters(
+                admin: state.admin,
                 selected: state.filter.status,
                 nearby: state.filter.nearbyLocation != null,
                 nearbyLoading:
@@ -274,6 +340,23 @@ class _FieldReportsScreenState extends ConsumerState<FieldReportsScreen>
                 onNearby: _nearby,
               ),
             ),
+            if (state.admin)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                  child: AppInlineNotice(
+                    icon: Icons.lock_outline,
+                    message: l10n.reportPrivateNotice,
+                  ),
+                ),
+              ),
+            if (mapMode && state.loading)
+              SliverToBoxAdapter(
+                child: LinearProgressIndicator(
+                  key: const ValueKey('report-map-loading'),
+                  semanticsLabel: l10n.reportMapLoading,
+                ),
+              ),
             if (state.filter.nearbyLocation != null)
               SliverToBoxAdapter(
                 child: _NearbyFilterEffect(
@@ -290,7 +373,9 @@ class _FieldReportsScreenState extends ConsumerState<FieldReportsScreen>
                   ),
                   child: AppInlineNotice(
                     icon: Icons.cloud_off_outlined,
-                    message: l10n.reportStale,
+                    message: mapMode
+                        ? l10n.reportMapIncomplete
+                        : l10n.reportStale,
                     tone: AppFeedbackTone.warning,
                     actionLabel: l10n.commonRetry,
                     onAction: ref.read(fieldReportsProvider.notifier).refresh,
@@ -323,10 +408,14 @@ class _FieldReportsScreenState extends ConsumerState<FieldReportsScreen>
                   liveRegion: true,
                 ),
               )
-            else if (_mapMode)
+            else if (mapMode)
               SliverFillRemaining(
-                hasScrollBody: false,
-                child: _ReportMap(items: items),
+                hasScrollBody: true,
+                child: _ReportMap(
+                  key: ValueKey((access, state.admin)),
+                  items: items,
+                  onOpenReport: _openReport,
+                ),
               )
             else
               SliverPadding(
@@ -339,17 +428,26 @@ class _FieldReportsScreenState extends ConsumerState<FieldReportsScreen>
                           : 0),
                   itemBuilder: (context, index) {
                     if (index == items.length) {
-                      Future.microtask(
-                        ref.read(fieldReportsProvider.notifier).loadMore,
-                      );
-                      return const Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Center(child: CircularProgressIndicator()),
+                      return Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: OutlinedButton.icon(
+                          key: const ValueKey('report-load-more'),
+                          onPressed: state.appending || state.loading
+                              ? null
+                              : ref
+                                    .read(fieldReportsProvider.notifier)
+                                    .loadMore,
+                          icon: const Icon(Icons.expand_more),
+                          label: Text(l10n.reportLoadMore),
+                        ),
                       );
                     }
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: _ReportCard(report: items[index]),
+                      child: _ReportCard(
+                        report: items[index],
+                        onTap: () => _openReport(items[index]),
+                      ),
                     );
                   },
                 ),
@@ -677,11 +775,13 @@ class _ReportViewOption extends StatelessWidget {
 class _ReportFilters extends ConsumerWidget {
   const _ReportFilters({
     this.selected,
+    required this.admin,
     required this.nearby,
     required this.nearbyLoading,
     required this.onNearby,
   });
   final String? selected;
+  final bool admin;
   final bool nearby;
   final bool nearbyLoading;
   final VoidCallback onNearby;
@@ -690,6 +790,9 @@ class _ReportFilters extends ConsumerWidget {
     final l10n = context.l10n;
     final statuses = <String?, String>{
       null: l10n.reportStatusAll,
+      if (admin) 'pending': l10n.reportStatusPending,
+      if (admin) 'under_review': l10n.reportStatusReview,
+      if (admin) 'rejected': l10n.reportStatusRejected,
       'approved': l10n.reportStatusApproved,
       'resolved': l10n.reportStatusResolved,
     };
@@ -712,34 +815,35 @@ class _ReportFilters extends ConsumerWidget {
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              key: const ValueKey('report-nearby-filter'),
-              selected: nearby,
-              avatar: AnimatedSwitcher(
-                duration: AppMotion.of(context, AppMotion.state),
-                child: nearbyLoading
-                    ? const SizedBox(
-                        key: ValueKey('report-nearby-loading'),
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        nearby
-                            ? Icons.my_location_outlined
-                            : Icons.near_me_outlined,
-                        key: ValueKey('report-nearby-icon-$nearby'),
-                        size: 18,
-                      ),
+          if (!admin)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilterChip(
+                key: const ValueKey('report-nearby-filter'),
+                selected: nearby,
+                avatar: AnimatedSwitcher(
+                  duration: AppMotion.of(context, AppMotion.state),
+                  child: nearbyLoading
+                      ? const SizedBox(
+                          key: ValueKey('report-nearby-loading'),
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(
+                          nearby
+                              ? Icons.my_location_outlined
+                              : Icons.near_me_outlined,
+                          key: ValueKey('report-nearby-icon-$nearby'),
+                          size: 18,
+                        ),
+                ),
+                onSelected: (_) => nearby
+                    ? ref.read(fieldReportsProvider.notifier).clearNearby()
+                    : onNearby(),
+                label: Text(context.l10n.reportNearby30Days),
               ),
-              onSelected: (_) => nearby
-                  ? ref.read(fieldReportsProvider.notifier).clearNearby()
-                  : onNearby(),
-              label: Text(context.l10n.reportNearby30Days),
             ),
-          ),
         ],
       ),
     );
@@ -967,8 +1071,9 @@ class _NearbyFilterSheetState extends State<_NearbyFilterSheet> {
 }
 
 class _ReportCard extends StatelessWidget {
-  const _ReportCard({required this.report});
+  const _ReportCard({required this.report, required this.onTap});
   final FieldReport report;
+  final VoidCallback onTap;
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
@@ -977,7 +1082,7 @@ class _ReportCard extends StatelessWidget {
     return Semantics(
       button: true,
       label:
-          '${report.referenceCode}, ${_status(context, report.status)}, ${report.description}',
+          '${report.referenceCode}, ${reportStatusLabel(context, report.status)}, ${report.description}',
       child: Container(
         decoration: BoxDecoration(
           color: colors.surfaceContainerLowest,
@@ -991,12 +1096,7 @@ class _ReportCard extends StatelessWidget {
         child: InkWell(
           key: ValueKey('report-card-${report.id}'),
           borderRadius: BorderRadius.circular(16),
-          onTap: () => showModalBottomSheet<void>(
-            context: context,
-            showDragHandle: true,
-            isScrollControlled: true,
-            builder: (context) => _PublicReportSheet(report: report),
-          ),
+          onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -1035,19 +1135,20 @@ class _ReportCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          Expanded(
-                            child: Text(
-                              report.referenceCode,
-                              style: Theme.of(context).textTheme.labelLarge
-                                  ?.copyWith(
-                                    color: colors.primary,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                            ),
+                          Text(
+                            report.referenceCode,
+                            style: Theme.of(context).textTheme.labelLarge
+                                ?.copyWith(
+                                  color: colors.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
                           ),
-                          _StatusPill(status: report.status),
+                          ReportStatusBadge(status: report.status),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -1073,9 +1174,11 @@ class _ReportCard extends StatelessWidget {
                                 color: colors.onSurfaceVariant,
                               ),
                               const SizedBox(width: 5),
-                              Text(
-                                _relative(report.createdAt, l10n),
-                                style: Theme.of(context).textTheme.bodySmall,
+                              Flexible(
+                                child: Text(
+                                  _relative(report.createdAt, l10n),
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
                               ),
                             ],
                           ),
@@ -1089,9 +1192,13 @@ class _ReportCard extends StatelessWidget {
                                   color: colors.onSurfaceVariant,
                                 ),
                                 const SizedBox(width: 4),
-                                Text(
-                                  '${report.distanceMeters!.round()} m',
-                                  style: Theme.of(context).textTheme.bodySmall,
+                                Flexible(
+                                  child: Text(
+                                    '${report.distanceMeters!.round()} m',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
+                                  ),
                                 ),
                               ],
                             ),
@@ -1127,7 +1234,7 @@ class _PublicReportSheet extends StatelessWidget {
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
             ),
-            _StatusPill(status: report.status),
+            ReportStatusBadge(status: report.status),
           ],
         ),
         const SizedBox(height: 18),
@@ -1157,61 +1264,14 @@ class _PublicReportSheet extends StatelessWidget {
   );
 }
 
-class _StatusPill extends StatelessWidget {
-  const _StatusPill({required this.status});
-  final String status;
-  @override
-  Widget build(BuildContext context) {
-    final (bg, fg, icon) = switch (status) {
-      'resolved' => (
-        AppColors.successSoft(Theme.of(context).brightness),
-        AppColors.statusResolved,
-        Icons.check_circle_outline,
-      ),
-      'in_progress' => (
-        AppColors.warningSoft(Theme.of(context).brightness),
-        AppColors.statusInProgress,
-        Icons.autorenew,
-      ),
-      'rejected' || 'error' => (
-        AppColors.errorSoft(Theme.of(context).brightness),
-        AppColors.statusError,
-        Icons.error_outline,
-      ),
-      _ => (
-        AppColors.infoSoft(Theme.of(context).brightness),
-        AppColors.statusNew,
-        Icons.fiber_new_outlined,
-      ),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: fg.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: fg),
-          const SizedBox(width: 4),
-          Text(
-            _status(context, status),
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: fg,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _ReportMap extends StatefulWidget {
-  const _ReportMap({required this.items});
+  const _ReportMap({
+    super.key,
+    required this.items,
+    required this.onOpenReport,
+  });
   final List<FieldReport> items;
+  final ValueChanged<FieldReport> onOpenReport;
   @override
   State<_ReportMap> createState() => _ReportMapState();
 }
@@ -1236,10 +1296,7 @@ class _ReportMapState extends State<_ReportMap> {
   ({Point center, double zoom}) _viewportForReports() {
     final saved = _persistedReportMapCamera;
     if (saved != null) {
-      return (
-        center: saved.center,
-        zoom: saved.zoom,
-      );
+      return (center: saved.center, zoom: saved.zoom);
     }
     return _camPhaFallback;
   }
@@ -1247,13 +1304,13 @@ class _ReportMapState extends State<_ReportMap> {
   Future<void> _recenter() {
     _persistedReportMapCamera = null;
     return _map?.flyTo(
-      CameraOptions(
-        center: MapDefaults.center,
-        zoom: MapDefaults.defaultZoom,
-      ),
-      MapAnimationOptions(duration: AppMotion.camera(context, far: true)),
-    ) ??
-    Future.value();
+          CameraOptions(
+            center: MapDefaults.center,
+            zoom: MapDefaults.defaultZoom,
+          ),
+          MapAnimationOptions(duration: AppMotion.camera(context, far: true)),
+        ) ??
+        Future.value();
   }
 
   Future<void> _zoomIn() async {
@@ -1262,8 +1319,10 @@ class _ReportMapState extends State<_ReportMap> {
     final duration = AppMotion.camera(context, far: false);
     try {
       final cameraState = await map.getCameraState();
-      final targetZoom =
-          (cameraState.zoom + 1.0).clamp(MapDefaults.minZoom, MapDefaults.maxZoom);
+      final targetZoom = (cameraState.zoom + 1.0).clamp(
+        MapDefaults.minZoom,
+        MapDefaults.maxZoom,
+      );
       await map.flyTo(
         CameraOptions(zoom: targetZoom),
         MapAnimationOptions(duration: duration),
@@ -1277,8 +1336,10 @@ class _ReportMapState extends State<_ReportMap> {
     final duration = AppMotion.camera(context, far: false);
     try {
       final cameraState = await map.getCameraState();
-      final targetZoom =
-          (cameraState.zoom - 1.0).clamp(MapDefaults.minZoom, MapDefaults.maxZoom);
+      final targetZoom = (cameraState.zoom - 1.0).clamp(
+        MapDefaults.minZoom,
+        MapDefaults.maxZoom,
+      );
       await map.flyTo(
         CameraOptions(zoom: targetZoom),
         MapAnimationOptions(duration: duration),
@@ -1296,12 +1357,7 @@ class _ReportMapState extends State<_ReportMap> {
   void _openReportFromAnnotation(CircleAnnotation annotation) {
     final report = _reportsByAnnotationId[annotation.id];
     if (report == null || !mounted) return;
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (context) => _PublicReportSheet(report: report),
-    );
+    widget.onOpenReport(report);
   }
 
   Future<void> _render() async {
@@ -1320,9 +1376,7 @@ class _ReportMapState extends State<_ReportMap> {
                 ),
               ),
               circleRadius: 10,
-              circleColor: report.status == 'resolved'
-                  ? 0xFF2D6A4F
-                  : 0xFFD97745,
+              circleColor: reportStatusColor(report.status).toARGB32(),
               circleStrokeWidth: 3,
               circleStrokeColor: 0xFFFFFFFF,
             ),
@@ -1394,8 +1448,8 @@ class _ReportMapState extends State<_ReportMap> {
                   quickZoomEnabled: true,
                 ),
               );
-              final manager =
-                  await map.annotations.createCircleAnnotationManager();
+              final manager = await map.annotations
+                  .createCircleAnnotationManager();
               if (!mounted) return;
               manager.tapEvents(onTap: _openReportFromAnnotation);
               _manager = manager;
@@ -1500,15 +1554,6 @@ class _ReportMapControl extends StatelessWidget {
     icon: Icon(icon),
   );
 }
-
-String _status(BuildContext context, String status) => switch (status) {
-  'pending' => context.l10n.reportStatusPending,
-  'under_review' => context.l10n.reportStatusReview,
-  'approved' => context.l10n.reportStatusApproved,
-  'rejected' => context.l10n.reportStatusRejected,
-  'resolved' => context.l10n.reportStatusResolved,
-  _ => status,
-};
 
 String _relative(DateTime date, dynamic l10n) {
   final difference = DateTime.now().difference(date.toLocal());

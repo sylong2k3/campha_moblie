@@ -2,24 +2,21 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
 /// Cẩm Phả default map center & zoom — single source of truth.
 abstract final class MapDefaults {
-  static const longitude = 107.32;
-  static const latitude = 21.11;
-  static const defaultZoom = 9.6;
+  static const longitude = 107.319395;
+  static const latitude = 21.025420;
+  static const defaultZoom = 9.84;
   static const minZoom = 8.5;
   static const maxZoom = 20.0;
 
-  // Giới hạn không gian địa lý Cẩm Phả: [107.0, 20.7, 108.0, 21.35]
-  static const minLongitude = 107.0;
-  static const minLatitude = 20.7;
-  static const maxLongitude = 108.0;
-  static const maxLatitude = 21.35;
+  // ponytail: Khung chữ nhật chỉ chặn tâm camera ra biển xa; muốn bám sát bờ cần ranh giới đa giác.
+  static const minLongitude = 102.0;
+  static const minLatitude = 19.2;
+  static const maxLongitude = 107.6;
+  static const maxLatitude = 23.5;
 
   static final center = Point(coordinates: Position(longitude, latitude));
 
-  static final cameraOptions = CameraOptions(
-    center: center,
-    zoom: defaultZoom,
-  );
+  static final cameraOptions = CameraOptions(center: center, zoom: defaultZoom);
 
   static final cameraBounds = CameraBoundsOptions(
     bounds: CoordinateBounds(

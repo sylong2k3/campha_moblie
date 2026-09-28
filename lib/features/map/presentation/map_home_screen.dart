@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -93,28 +94,33 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
   bool _showLegendCard = true;
   static final _cameraBounds = MapDefaults.cameraBounds;
   static CameraState? _persistedCameraState;
+  final CameraState? _initialCameraState = _persistedCameraState;
+  bool _cameraReady = false;
 
   void _onCameraChange(CameraChangedEventData event) {
+    if (!mounted || !_cameraReady) return;
     _persistedCameraState = event.cameraState;
   }
 
-  final ViewportState _initialViewport = CameraViewportState(
-    center: MapDefaults.center,
-    zoom: MapDefaults.defaultZoom,
-  );
-
-  ViewportState get _effectiveViewport {
-    final saved = _persistedCameraState;
-    if (saved != null) {
-      return CameraViewportState(
-        center: saved.center,
-        zoom: saved.zoom,
-        bearing: saved.bearing,
-        pitch: saved.pitch,
-      );
-    }
-    return _initialViewport;
+  void _logCameraPosition(MapIdleEventData event) {
+    final camera = _persistedCameraState;
+    if (!mounted || camera == null) return;
+    final center = camera.center.coordinates;
+    debugPrint(
+      '[MAP_CAMERA] longitude=${center.lng.toStringAsFixed(6)}, '
+      'latitude=${center.lat.toStringAsFixed(6)}, '
+      'zoom=${camera.zoom.toStringAsFixed(2)}, '
+      'bearing=${camera.bearing.toStringAsFixed(2)}, '
+      'pitch=${camera.pitch.toStringAsFixed(2)}',
+    );
   }
+
+  late final ViewportState _initialViewport = CameraViewportState(
+    center: _initialCameraState?.center ?? MapDefaults.center,
+    zoom: _initialCameraState?.zoom ?? MapDefaults.defaultZoom,
+    bearing: _initialCameraState?.bearing,
+    pitch: _initialCameraState?.pitch,
+  );
 
   final Set<String> _renderedLayerIds = {};
   late final TokenStorage _tokenStorage;
@@ -142,13 +148,11 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     WidgetsBinding.instance.addObserver(this);
     _tokenStorage = ref.read(tokenStorageProvider);
     _apiHost = ref.read(mapRepositoryProvider).apiHost;
-    _tokenStorage.addTokenChangeListener(_applyMapAuth);
+    _tokenStorage.addTokenChangeListener(_onMapTokenChanged);
     ref.listenManual<SessionState>(sessionControllerProvider, (previous, next) {
       final previousId = previous?.user?.id;
       final nextId = next.user?.id;
       if (previousId != nextId || previous?.status != next.status) {
-        ref.read(mapCatalogProvider.notifier).resetForIdentityChange();
-        ref.read(mapRepositoryProvider).clearTileTickets();
         if (previous?.isBootstrapping == false) {
           ref.read(floodScenarioProvider.notifier).resetForIdentityChange();
           ref.read(floodHydrologyProvider.notifier).resetForIdentityChange();
@@ -163,6 +167,34 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
         } else {
           unawaited(_startRoutePositionTracking());
         }
+      }
+      _queueFieldOverlay(next);
+    });
+    ref.listenManual<MapCatalogState>(mapCatalogProvider, (previous, next) {
+      unawaited(_syncCatalog(previous, next));
+      if (previous != null && next.activeCount > previous.activeCount) {
+        if (mounted) setState(() => _showLegendCard = true);
+      }
+    });
+    ref.listenManual(floodScenarioProvider, (prev, next) {
+      _syncThematicOverlays();
+      if (prev?.selectedScenarioId != next.selectedScenarioId &&
+          next.selectedScenarioId != null) {
+        if (mounted) setState(() => _showLegendCard = true);
+      }
+    });
+    ref.listenManual(floodHydrologyProvider, (prev, next) {
+      _syncThematicOverlays();
+      final prevCount = prev?.visibleIds.length ?? 0;
+      final nextCount = next.visibleIds.length;
+      if (nextCount > prevCount) {
+        if (mounted) setState(() => _showLegendCard = true);
+      }
+    });
+    ref.listenManual(forestClassificationProvider, (prev, next) {
+      _syncThematicOverlays();
+      if (prev?.isVisible != next.isVisible && next.isVisible) {
+        if (mounted) setState(() => _showLegendCard = true);
       }
     });
     _rasterTicketRefreshTimer = Timer.periodic(
@@ -195,7 +227,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     _rasterTicketRefreshTimer?.cancel();
     _thematicRenderer?.dispose();
     unawaited(_stopRoutePositionTracking());
-    _tokenStorage.removeTokenChangeListener(_applyMapAuth);
+    _tokenStorage.removeTokenChangeListener(_onMapTokenChanged);
     final map = _map;
     _map = null;
     _styleReady = false;
@@ -229,6 +261,9 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
       if (!_isCurrentStyle(map, revision) || !_mapAuthReady) return;
       if (!_rendersAsGeoServerWms(layer) || layer.isPublic) continue;
       if (!_renderedLayerIds.contains(layer.id)) continue;
+      // Nhường frame giữa các lần refresh raster.
+      await Future<void>.delayed(Duration.zero);
+      if (!_isCurrentStyle(map, revision) || !_mapAuthReady) return;
       await _removeLayer(map, layer.id);
       if (!_isCurrentStyle(map, revision)) return;
       await _addLayer(map, layer, catalog.opacityOf(layer.id));
@@ -358,6 +393,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
   Future<void> _onMapCreated(MapboxMap map) async {
     if (!mounted) return;
     _map = map;
+    _cameraReady = false;
     _styleReady = false;
     _styleRevision++;
     _renderedLayerIds.clear();
@@ -375,7 +411,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
         ? MapboxStyles.STANDARD
         : ApiConfig.mapboxStyleStreet;
     try {
-      final savedCamera = _persistedCameraState;
+      final savedCamera = _initialCameraState;
       await map.setCamera(
         savedCamera != null
             ? CameraOptions(
@@ -389,6 +425,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
       if (!mounted || !identical(_map, map)) return;
       await map.setBounds(_cameraBounds);
       if (!mounted || !identical(_map, map)) return;
+      _cameraReady = true;
       await _applyMapAuth();
       if (!mounted || !identical(_map, map)) return;
       await map.compass.updateSettings(CompassSettings(enabled: false));
@@ -399,6 +436,11 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     } catch (error) {
       _reportMapError(map, 'create', error);
     }
+  }
+
+  Future<void> _onMapTokenChanged() async {
+    await _applyMapAuth();
+    if (mounted) await _syncMap(ref.read(mapCatalogProvider));
   }
 
   Future<void> _applyMapAuth() async {
@@ -475,12 +517,18 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
       if (!_isCurrentStyle(map, revision)) return;
       await _applyMapLanguage();
       if (!_isCurrentStyle(map, revision)) return;
+      // Nhường frame để UI xử lý gesture trước khi tiếp tục chuỗi platform calls.
+      await Future<void>.delayed(Duration.zero);
+      if (!_isCurrentStyle(map, revision)) return;
       await _applyMapAuth();
       if (!_isCurrentStyle(map, revision) || !_mapAuthReady) return;
       final catalog = ref.read(mapCatalogProvider);
       await _applyBasemap(catalog.selectedBasemap);
       if (!_isCurrentStyle(map, revision)) return;
       _installFieldTapInteraction();
+      // Nhường frame trước khi sync layers nặng.
+      await Future<void>.delayed(Duration.zero);
+      if (!_isCurrentStyle(map, revision)) return;
       await _syncMap(catalog);
       if (!_isCurrentStyle(map, revision)) return;
       await _syncFieldOverlay(ref.read(fieldToolsProvider));
@@ -561,6 +609,13 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     MapCatalogState? previous,
     MapCatalogState next,
   ) async {
+    if (previous != null &&
+        previous.selectedBasemapCode == next.selectedBasemapCode &&
+        identical(previous.layers, next.layers) &&
+        setEquals(previous.activeLayerIds, next.activeLayerIds) &&
+        mapEquals(previous.opacityByLayer, next.opacityByLayer)) {
+      return;
+    }
     final map = _map;
     final revision = _styleRevision;
     if (map == null || !_isCurrentStyle(map, revision) || !_mapAuthReady) {
@@ -646,9 +701,25 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
       return;
     }
     var removedAny = false;
+    // Catalog mới có thể không còn layer riêng tư của tài khoản cũ.
+    // Duyệt layer native đã render, không chỉ danh sách API vừa trả về.
+    final allowedIds = state.layers.map((layer) => layer.id).toSet();
+    for (final layerId in _renderedLayerIds.difference(allowedIds)) {
+      if (!_isCurrentStyle(map, revision) || !_mapAuthReady) return;
+      await _removeLayer(map, layerId);
+      removedAny = true;
+    }
     for (final layer in state.layers) {
       if (!_isCurrentStyle(map, revision) || !_mapAuthReady) return;
+      // Nhường lượt event loop giữa các layer; không ép camera hoặc reload style.
+      await Future<void>.delayed(Duration.zero);
+      if (!_isCurrentStyle(map, revision) || !_mapAuthReady) return;
+      if (!identical(state, ref.read(mapCatalogProvider))) {
+        _needsSyncMap = true;
+        return;
+      }
       final shouldRender = state.activeLayerIds.contains(layer.id);
+      if (!shouldRender && !_renderedLayerIds.contains(layer.id)) continue;
       final styleLayerId = _styleLayerId(layer);
       final rendered = await map.style.styleLayerExists(styleLayerId);
       if (!_isCurrentStyle(map, revision) || !_mapAuthReady) return;
@@ -676,9 +747,6 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
           state.opacityOf(layer.id),
           position: position,
         );
-        if (!_rendersAsGeoServerWms(layer)) {
-          await Future.delayed(const Duration(milliseconds: 250));
-        }
       } else if (!shouldRender && rendered) {
         await _removeLayer(map, layer.id);
         removedAny = true;
@@ -1544,9 +1612,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
         _openMeasure,
       ),
       _ToolItem(Icons.route_outlined, context.l10n.routeTitle, _openRoute),
-      if (ref.read(sessionControllerProvider).user case final user?
-          when user.roleCode == 'so_tnmt' &&
-              user.hasPermission('map_feature', 'update'))
+      if (ref.read(sessionControllerProvider).user?.canEditMapFeatures == true)
         _ToolItem(
           Icons.sync_problem_outlined,
           context.l10n.featureSyncTitle,
@@ -1809,36 +1875,6 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
     }
     final catalog = ref.watch(mapCatalogProvider);
     final toolActive = _activeToolPanel != FieldToolMode.idle;
-    ref.listen<MapCatalogState>(mapCatalogProvider, (previous, next) {
-      unawaited(_syncCatalog(previous, next));
-      if (previous != null && next.activeCount > previous.activeCount) {
-        if (mounted) setState(() => _showLegendCard = true);
-      }
-    });
-    ref.listen(floodScenarioProvider, (prev, next) {
-      _syncThematicOverlays();
-      if (prev?.selectedScenarioId != next.selectedScenarioId &&
-          next.selectedScenarioId != null) {
-        if (mounted) setState(() => _showLegendCard = true);
-      }
-    });
-    ref.listen(floodHydrologyProvider, (prev, next) {
-      _syncThematicOverlays();
-      final prevCount = prev?.visibleIds.length ?? 0;
-      final nextCount = next.visibleIds.length;
-      if (nextCount > prevCount) {
-        if (mounted) setState(() => _showLegendCard = true);
-      }
-    });
-    ref.listen(forestClassificationProvider, (prev, next) {
-      _syncThematicOverlays();
-      if (prev?.isVisible != next.isVisible && next.isVisible) {
-        if (mounted) setState(() => _showLegendCard = true);
-      }
-    });
-    ref.listen<FieldToolsState>(fieldToolsProvider, (_, next) {
-      _queueFieldOverlay(next);
-    });
 
     final activeLayers = catalog.layers
         .where((l) => catalog.activeLayerIds.contains(l.id))
@@ -1935,9 +1971,7 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
           LegendGroup(
             id: layer.code.isNotEmpty ? layer.code : layer.id,
             title: layer.nameVi,
-            entries: [
-              LegendEntry(label: layer.nameVi, colorHex: hex),
-            ],
+            entries: [LegendEntry(label: layer.nameVi, colorHex: hex)],
           ),
         );
       }
@@ -2019,9 +2053,10 @@ class _MapHomeScreenState extends ConsumerState<MapHomeScreen>
             styleUri: ApiConfig.mapboxStyleStreet.isEmpty
                 ? MapboxStyles.STANDARD
                 : ApiConfig.mapboxStyleStreet,
-            viewport: _effectiveViewport,
+            viewport: _initialViewport,
             onMapCreated: _onMapCreated,
             onCameraChangeListener: _onCameraChange,
+            onMapIdleListener: kDebugMode ? _logCameraPosition : null,
             onStyleLoadedListener: _onStyleLoaded,
             onMapLoadedListener: _onMapLoaded,
             onMapLoadErrorListener: (event) {

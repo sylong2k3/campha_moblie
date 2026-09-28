@@ -9,6 +9,82 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get reportAdminView => 'Manage reports';
+
+  @override
+  String get reportAdminSubtitle =>
+      'Track every status, verify and review field reports.';
+
+  @override
+  String get reportPublicView => 'Public';
+
+  @override
+  String get reportPrivateNotice =>
+      'Internal information · Authorized staff only';
+
+  @override
+  String get reportSender => 'Sender';
+
+  @override
+  String get reportReviewer => 'Reviewer (ID)';
+
+  @override
+  String get reportReviewedAt => 'Reviewed at';
+
+  @override
+  String get reportReviewAction => 'Update status';
+
+  @override
+  String get reportReviewReasonHint =>
+      'Explain the decision. Required when rejecting a report.';
+
+  @override
+  String get reportReviewReasonInvalid =>
+      'Reason must contain 5–1,000 characters.';
+
+  @override
+  String get reportReviewSubmit => 'Save status';
+
+  @override
+  String get reportReviewSaved => 'Report status updated.';
+
+  @override
+  String get reportReviewConflict =>
+      'Someone else updated this report. Reload and check it before reviewing again.';
+
+  @override
+  String get reportClustersTitle => 'Report hotspots';
+
+  @override
+  String get reportClustersEmpty => 'No report clusters match these filters.';
+
+  @override
+  String get reportClusterMinReporters => 'Minimum distinct reporters';
+
+  @override
+  String get reportClusterReports => 'Reports';
+
+  @override
+  String get reportClusterReporters => 'Distinct reporters';
+
+  @override
+  String get reportClusterAnalyze => 'Analyze clusters';
+
+  @override
+  String get reportClustersLimit =>
+      'Up to 200 clusters ranked by distinct reporters. Not a total of all reports in the area.';
+
+  @override
+  String get reportMapLoading => 'Loading all reports onto the map…';
+
+  @override
+  String get reportMapIncomplete =>
+      'Could not load all reports onto the map. Please retry.';
+
+  @override
+  String get reportLoadMore => 'Load more reports';
+
+  @override
   String get appTitle => 'Cam Pha GIS';
 
   @override

@@ -98,6 +98,144 @@ abstract class AppLocalizations {
     Locale('vi'),
   ];
 
+  /// No description provided for @reportAdminView.
+  ///
+  /// In vi, this message translates to:
+  /// **'Quản lý phản ánh'**
+  String get reportAdminView;
+
+  /// No description provided for @reportAdminSubtitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Theo dõi toàn bộ trạng thái, xác minh và xử lý phản ánh hiện trường.'**
+  String get reportAdminSubtitle;
+
+  /// No description provided for @reportPublicView.
+  ///
+  /// In vi, this message translates to:
+  /// **'Công khai'**
+  String get reportPublicView;
+
+  /// No description provided for @reportPrivateNotice.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thông tin nội bộ · Chỉ dành cho cán bộ có quyền'**
+  String get reportPrivateNotice;
+
+  /// No description provided for @reportSender.
+  ///
+  /// In vi, this message translates to:
+  /// **'Người gửi'**
+  String get reportSender;
+
+  /// No description provided for @reportReviewer.
+  ///
+  /// In vi, this message translates to:
+  /// **'Người xử lý (ID)'**
+  String get reportReviewer;
+
+  /// No description provided for @reportReviewedAt.
+  ///
+  /// In vi, this message translates to:
+  /// **'Thời điểm xử lý'**
+  String get reportReviewedAt;
+
+  /// No description provided for @reportReviewAction.
+  ///
+  /// In vi, this message translates to:
+  /// **'Cập nhật trạng thái'**
+  String get reportReviewAction;
+
+  /// No description provided for @reportReviewReasonHint.
+  ///
+  /// In vi, this message translates to:
+  /// **'Ghi rõ căn cứ xử lý. Bắt buộc khi từ chối.'**
+  String get reportReviewReasonHint;
+
+  /// No description provided for @reportReviewReasonInvalid.
+  ///
+  /// In vi, this message translates to:
+  /// **'Lý do phải có từ 5 đến 1.000 ký tự.'**
+  String get reportReviewReasonInvalid;
+
+  /// No description provided for @reportReviewSubmit.
+  ///
+  /// In vi, this message translates to:
+  /// **'Lưu trạng thái'**
+  String get reportReviewSubmit;
+
+  /// No description provided for @reportReviewSaved.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đã cập nhật trạng thái phản ánh.'**
+  String get reportReviewSaved;
+
+  /// No description provided for @reportReviewConflict.
+  ///
+  /// In vi, this message translates to:
+  /// **'Phản ánh đã được người khác cập nhật. Tải lại và kiểm tra trước khi xử lý tiếp.'**
+  String get reportReviewConflict;
+
+  /// No description provided for @reportClustersTitle.
+  ///
+  /// In vi, this message translates to:
+  /// **'Điểm nóng phản ánh'**
+  String get reportClustersTitle;
+
+  /// No description provided for @reportClustersEmpty.
+  ///
+  /// In vi, this message translates to:
+  /// **'Không có cụm phản ánh phù hợp bộ lọc.'**
+  String get reportClustersEmpty;
+
+  /// No description provided for @reportClusterMinReporters.
+  ///
+  /// In vi, this message translates to:
+  /// **'Số người gửi tối thiểu'**
+  String get reportClusterMinReporters;
+
+  /// No description provided for @reportClusterReports.
+  ///
+  /// In vi, this message translates to:
+  /// **'Phản ánh'**
+  String get reportClusterReports;
+
+  /// No description provided for @reportClusterReporters.
+  ///
+  /// In vi, this message translates to:
+  /// **'Người gửi khác nhau'**
+  String get reportClusterReporters;
+
+  /// No description provided for @reportClusterAnalyze.
+  ///
+  /// In vi, this message translates to:
+  /// **'Phân tích gom cụm'**
+  String get reportClusterAnalyze;
+
+  /// No description provided for @reportClustersLimit.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tối đa 200 cụm theo số người gửi. Không phải tổng số phản ánh toàn địa bàn.'**
+  String get reportClustersLimit;
+
+  /// No description provided for @reportMapLoading.
+  ///
+  /// In vi, this message translates to:
+  /// **'Đang tải toàn bộ phản ánh lên bản đồ…'**
+  String get reportMapLoading;
+
+  /// No description provided for @reportMapIncomplete.
+  ///
+  /// In vi, this message translates to:
+  /// **'Chưa tải được đầy đủ phản ánh lên bản đồ. Vui lòng thử lại.'**
+  String get reportMapIncomplete;
+
+  /// No description provided for @reportLoadMore.
+  ///
+  /// In vi, this message translates to:
+  /// **'Tải thêm phản ánh'**
+  String get reportLoadMore;
+
   /// No description provided for @appTitle.
   ///
   /// In vi, this message translates to:

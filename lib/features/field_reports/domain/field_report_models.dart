@@ -25,7 +25,10 @@ class FieldReportPage {
   final int totalPages;
   bool get hasMore => page < totalPages;
 
-  factory FieldReportPage.fromEnvelope(Map<String, dynamic> envelope) {
+  factory FieldReportPage.fromEnvelope(
+    Map<String, dynamic> envelope, {
+    bool publicOnly = false,
+  }) {
     final data = _map(envelope['data'], 'data');
     final metadata = _map(envelope['metadata'], 'metadata');
     final rawItems = data['items'];
@@ -34,7 +37,11 @@ class FieldReportPage {
     }
     return FieldReportPage(
       items: rawItems
-          .map((item) => FieldReport.fromJson(_map(item, 'data.items[]')))
+          .map(
+            (item) => publicOnly
+                ? FieldReport.fromPublicJson(_map(item, 'data.items[]'))
+                : FieldReport.fromJson(_map(item, 'data.items[]')),
+          )
           .toList(growable: false),
       page: _integer(metadata['page'], 'metadata.page'),
       limit: _integer(metadata['limit'], 'metadata.limit'),
@@ -59,6 +66,7 @@ class FieldReport {
     this.senderName,
     this.senderEmail,
     this.reviewReason,
+    this.reviewedBy,
     this.reviewedAt,
     this.photos = const [],
     this.history = const [],
@@ -78,12 +86,45 @@ class FieldReport {
   final String? senderName;
   final String? senderEmail;
   final String? reviewReason;
+  final String? reviewedBy;
   final DateTime? reviewedAt;
   final List<FieldReportPhoto> photos;
   final List<FieldReportHistory> history;
   final double? distanceMeters;
   final int? distinctReporters;
   bool get isPublic => status == 'approved' || status == 'resolved';
+
+  List<String> get reviewTransitions => switch (status) {
+    'pending' => const ['under_review', 'approved', 'rejected'],
+    'under_review' => const ['approved', 'rejected'],
+    'approved' => const ['resolved'],
+    _ => const [],
+  };
+
+  factory FieldReport.fromPublicJson(Map<String, dynamic> json) {
+    final report = FieldReport.fromJson({
+      for (final key in const [
+        'id',
+        'reference_code',
+        'description',
+        'status',
+        'longitude',
+        'latitude',
+        'measured_geometry',
+        'photo_count',
+        'created_at',
+        'updated_at',
+        'photos',
+        'distance_m',
+        'distinct_reporters',
+      ])
+        key: json[key],
+    });
+    if (!report.isPublic) {
+      throw const FormatException('Non-public field report in public response');
+    }
+    return report;
+  }
 
   factory FieldReport.fromJson(Map<String, dynamic> json) {
     final status = _requiredString(json, 'status');
@@ -121,6 +162,7 @@ class FieldReport {
       senderName: json['sender_name']?.toString(),
       senderEmail: json['sender_email']?.toString(),
       reviewReason: json['review_reason']?.toString(),
+      reviewedBy: json['reviewed_by']?.toString(),
       reviewedAt: _optionalDate(json['reviewed_at'], 'reviewed_at'),
       photos: photos == null
           ? const <FieldReportPhoto>[]
@@ -157,7 +199,7 @@ class FieldReportPhoto {
   final String originalName;
   final int sizeBytes;
   final Uri url;
-  final DateTime expiresAt;
+  final DateTime? expiresAt;
   factory FieldReportPhoto.fromJson(Map<String, dynamic> json) {
     final url = Uri.tryParse(_requiredString(json, 'url'));
     if (!_isSafeStorageUrl(url)) {
@@ -168,7 +210,7 @@ class FieldReportPhoto {
       originalName: _requiredString(json, 'originalName'),
       sizeBytes: _integer(json['sizeBytes'], 'sizeBytes'),
       url: url!,
-      expiresAt: _date(json['expiresAt'], 'expiresAt'),
+      expiresAt: _optionalDate(json['expiresAt'], 'expiresAt'),
     );
   }
 }
@@ -194,6 +236,40 @@ class FieldReportHistory {
         actorUserId: json['actor_user_id']?.toString(),
         createdAt: _date(json['created_at'], 'history.created_at'),
       );
+}
+
+class FieldReportCluster {
+  const FieldReportCluster({
+    required this.id,
+    required this.reportCount,
+    required this.reporterCount,
+    required this.location,
+  });
+
+  final int id;
+  final int reportCount;
+  final int reporterCount;
+  final GeoCoordinate location;
+
+  factory FieldReportCluster.fromJson(Map<String, dynamic> json) {
+    final longitude = _number(json['longitude'], 'longitude');
+    final latitude = _number(json['latitude'], 'latitude');
+    final reports = _integer(json['report_count'], 'report_count');
+    final reporters = _integer(json['reporter_count'], 'reporter_count');
+    if (longitude.abs() > 180 ||
+        latitude.abs() > 90 ||
+        reports < 0 ||
+        reporters < 0 ||
+        reporters > reports) {
+      throw const FormatException('Invalid field report cluster');
+    }
+    return FieldReportCluster(
+      id: _integer(json['cluster_id'], 'cluster_id'),
+      reportCount: reports,
+      reporterCount: reporters,
+      location: GeoCoordinate(longitude, latitude),
+    );
+  }
 }
 
 class UploadGrant {

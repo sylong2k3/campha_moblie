@@ -244,10 +244,7 @@ class _FeatureEditScreenState extends ConsumerState<FeatureEditScreen> {
         body: const Center(child: CircularProgressIndicator()),
       );
     }
-    if (layer == null ||
-        user?.roleCode != 'so_tnmt' ||
-        !user!.hasPermission('map_feature', 'update') ||
-        !layer.canEdit) {
+    if (layer == null || user?.canEditMapFeatures != true || !layer.canEdit) {
       return Scaffold(
         appBar: AppBar(),
         body: Center(child: Text(context.l10n.featureEditForbidden)),

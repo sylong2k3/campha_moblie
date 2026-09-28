@@ -81,6 +81,13 @@ class ApiEndpoints {
   static const fieldReportsNearby = '/field-reports/nearby';
   static const fieldReportsMine = '/field-reports/mine';
   static String fieldReportDetail(String id) => '/field-reports/$id';
+  static String fieldReportPublicDetail(String id) =>
+      '/field-reports/public/$id';
+  static const adminFieldReports = '/admin/field-reports';
+  static const adminFieldReportClusters = '/admin/field-reports/clusters';
+  static String adminFieldReportDetail(String id) => '/admin/field-reports/$id';
+  static String adminFieldReportReview(String id) =>
+      '/admin/field-reports/$id/review';
   static const storageUploadPresign = '/storage/uploads/presign';
   static String storageUploadCommit(String id) => '/storage/uploads/$id/commit';
   static String storageObject(String id) => '/storage/objects/$id';

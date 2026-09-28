@@ -9,6 +9,81 @@ class AppLocalizationsVi extends AppLocalizations {
   AppLocalizationsVi([String locale = 'vi']) : super(locale);
 
   @override
+  String get reportAdminView => 'Quản lý phản ánh';
+
+  @override
+  String get reportAdminSubtitle =>
+      'Theo dõi toàn bộ trạng thái, xác minh và xử lý phản ánh hiện trường.';
+
+  @override
+  String get reportPublicView => 'Công khai';
+
+  @override
+  String get reportPrivateNotice =>
+      'Thông tin nội bộ · Chỉ dành cho cán bộ có quyền';
+
+  @override
+  String get reportSender => 'Người gửi';
+
+  @override
+  String get reportReviewer => 'Người xử lý (ID)';
+
+  @override
+  String get reportReviewedAt => 'Thời điểm xử lý';
+
+  @override
+  String get reportReviewAction => 'Cập nhật trạng thái';
+
+  @override
+  String get reportReviewReasonHint =>
+      'Ghi rõ căn cứ xử lý. Bắt buộc khi từ chối.';
+
+  @override
+  String get reportReviewReasonInvalid => 'Lý do phải có từ 5 đến 1.000 ký tự.';
+
+  @override
+  String get reportReviewSubmit => 'Lưu trạng thái';
+
+  @override
+  String get reportReviewSaved => 'Đã cập nhật trạng thái phản ánh.';
+
+  @override
+  String get reportReviewConflict =>
+      'Phản ánh đã được người khác cập nhật. Tải lại và kiểm tra trước khi xử lý tiếp.';
+
+  @override
+  String get reportClustersTitle => 'Điểm nóng phản ánh';
+
+  @override
+  String get reportClustersEmpty => 'Không có cụm phản ánh phù hợp bộ lọc.';
+
+  @override
+  String get reportClusterMinReporters => 'Số người gửi tối thiểu';
+
+  @override
+  String get reportClusterReports => 'Phản ánh';
+
+  @override
+  String get reportClusterReporters => 'Người gửi khác nhau';
+
+  @override
+  String get reportClusterAnalyze => 'Phân tích gom cụm';
+
+  @override
+  String get reportClustersLimit =>
+      'Tối đa 200 cụm theo số người gửi. Không phải tổng số phản ánh toàn địa bàn.';
+
+  @override
+  String get reportMapLoading => 'Đang tải toàn bộ phản ánh lên bản đồ…';
+
+  @override
+  String get reportMapIncomplete =>
+      'Chưa tải được đầy đủ phản ánh lên bản đồ. Vui lòng thử lại.';
+
+  @override
+  String get reportLoadMore => 'Tải thêm phản ánh';
+
+  @override
   String get appTitle => 'GIS Cẩm Phả';
 
   @override

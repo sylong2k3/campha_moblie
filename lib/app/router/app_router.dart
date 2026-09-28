@@ -82,9 +82,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           (protectedReport || protectedFeatureEdit)) {
         return '${RoutePaths.login}?returnTo=${Uri.encodeQueryComponent(state.uri.toString())}';
       }
-      if (protectedFeatureEdit &&
-          (user?.roleCode != 'so_tnmt' ||
-              user?.hasPermission('map_feature', 'update') != true)) {
+      if (protectedFeatureEdit && user?.canEditMapFeatures != true) {
         return RoutePaths.map;
       }
       return null;
@@ -128,21 +126,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: RouteNames.forgotPassword,
         builder: (context, state) => const ForgotPasswordScreen(),
       ),
-      StatefulShellRoute(
+      StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => MainShell(navigationShell: shell),
-        navigatorContainerBuilder: (context, navigationShell, children) {
-          final currentIndex = navigationShell.currentIndex;
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              for (var i = 0; i < children.length; i++)
-                Visibility.maintain(
-                  visible: i == currentIndex,
-                  child: children[i],
-                ),
-            ],
-          );
-        },
         branches: [
           StatefulShellBranch(
             routes: [

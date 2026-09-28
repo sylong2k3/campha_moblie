@@ -44,6 +44,8 @@ class _Catalog extends MapCatalogController {
   MapCatalogState build() =>
       MapCatalogState(layers: [layer], activeLayerIds: {'1'});
   void refresh(LayerModel next) => state = state.copyWith(layers: [next]);
+  void setLoading(bool loading) => state = state.copyWith(loading: loading);
+  void removeAll() => state = state.copyWith(layers: [], activeLayerIds: {});
 }
 
 class _Guest extends SessionController {
@@ -155,10 +157,15 @@ class _Map extends Fake implements MapboxMap {
   final compass = _Compass();
   @override
   final scaleBar = _ScaleBar();
+  CameraOptions? lastCamera;
+  final boundsCalls = <CameraBoundsOptions>[];
   @override
-  Future<void> setCamera(CameraOptions options) async {}
+  Future<void> setCamera(CameraOptions options) async => lastCamera = options;
   @override
-  Future<void> setBounds(CameraBoundsOptions options) async {}
+  Future<void> setBounds(CameraBoundsOptions options) async {
+    boundsCalls.add(options);
+  }
+
   @override
   dynamic noSuchMethod(Invocation invocation) {
     if (invocation.memberName == #addInteraction ||
@@ -229,6 +236,165 @@ Future<void> _loadMap(WidgetTester tester, MapWidget widget) async {
 }
 
 void main() {
+  testWidgets('loading-only catalog changes do not touch native layers', (
+    tester,
+  ) async {
+    final catalog = _Catalog(_layer('POINT', {}));
+    final widget = await _pumpMap(tester, catalog, MapRepository(dio: Dio()));
+    final map = _Map();
+    widget.onMapCreated!(map);
+    await tester.pump();
+    await _loadStyle(tester, widget);
+    final checks = map.style.layerChecks;
+    final adds = map.style.sourceAdds;
+    final updates = map.style.updates;
+    catalog.setLoading(true);
+    await tester.pump();
+    catalog.setLoading(false);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(map.style.layerChecks, checks);
+    expect(map.style.sourceAdds, adds);
+    expect(map.style.updates, updates);
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant({TargetPlatform.windows}));
+
+  testWidgets('removes rendered layers absent from the new identity catalog', (
+    tester,
+  ) async {
+    final catalog = _Catalog(_layer('POINT', {}));
+    final widget = await _pumpMap(tester, catalog, MapRepository(dio: Dio()));
+    final map = _Map();
+    widget.onMapCreated!(map);
+    await tester.pump();
+    await _loadStyle(tester, widget);
+    expect(map.style.layers, contains('mvt-style-1'));
+    catalog.removeAll();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(map.style.layers, isNot(contains('mvt-style-1')));
+    expect(map.style.sources, isNot(contains('mvt-1')));
+    expect(tester.takeException(), isNull);
+  }, variant: TargetPlatformVariant({TargetPlatform.windows}));
+
+  testWidgets(
+    'opens at Cẩm Phả; camera covers Hà Nội and Tây Bắc, not biển xa',
+    (tester) async {
+      final widget = await _pumpMap(
+        tester,
+        _Catalog(_layer('POINT', {})),
+        MapRepository(dio: Dio()),
+      );
+      final initialViewport = widget.viewport! as CameraViewportState;
+      expect(initialViewport.center!.coordinates.lng, 107.319395);
+      expect(initialViewport.center!.coordinates.lat, 21.025420);
+      expect(initialViewport.zoom, 9.84);
+
+      // Native may send a camera event before onMapCreated finishes.
+      widget.onCameraChangeListener!(
+        CameraChangedEventData.fromJson({
+          'timestamp': 0,
+          'cameraState': {
+            'center': {
+              'type': 'Point',
+              'coordinates': [105.85, 21.03],
+            },
+            'padding': {'top': 0, 'left': 0, 'bottom': 0, 'right': 0},
+            'zoom': 10.0,
+            'bearing': 0.0,
+            'pitch': 0.0,
+          },
+        }),
+      );
+      final map = _Map();
+      widget.onMapCreated!(map);
+      await tester.pump();
+      await _loadMap(tester, widget);
+
+      expect(map.lastCamera!.center!.coordinates.lng, 107.319395);
+      expect(map.lastCamera!.center!.coordinates.lat, 21.025420);
+      expect(map.lastCamera!.zoom, 9.84);
+      expect(map.boundsCalls, isNotEmpty);
+      for (final options in map.boundsCalls) {
+        final bounds = options.bounds!;
+        final west = bounds.southwest.coordinates.lng;
+        final east = bounds.northeast.coordinates.lng;
+        final south = bounds.southwest.coordinates.lat;
+        final north = bounds.northeast.coordinates.lat;
+        // A Pa Chải, Lũng Cú, Hà Nội, Thanh Hóa và Cẩm Phả trong khung.
+        for (final (lng, lat) in [
+          (102.15, 22.4),
+          (105.3, 23.39),
+          (105.85, 21.03),
+          (105.78, 19.8),
+          (104.5, 19.3),
+          (107.319395, 21.025420),
+        ]) {
+          expect(lng, inInclusiveRange(west, east));
+          expect(lat, inInclusiveRange(south, north));
+        }
+        expect(west, 102.0);
+        expect(south, 19.2);
+        expect(east, 107.6);
+        expect(north, 23.5);
+        expect(108.5, greaterThan(east));
+        expect(18.5, lessThan(south));
+        expect(options.minZoom, 8.5);
+        expect(options.maxZoom, 20.0);
+      }
+      expect(
+        tester.widget<MapWidget>(find.byType(MapWidget)).viewport,
+        same(initialViewport),
+      );
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant({TargetPlatform.windows}),
+  );
+
+  testWidgets('logs latest camera position only when map becomes idle', (
+    tester,
+  ) async {
+    final widget = await _pumpMap(
+      tester,
+      _Catalog(_layer('POINT', {})),
+      MapRepository(dio: Dio()),
+    );
+    final messages = <String?>[];
+    final originalDebugPrint = debugPrint;
+    debugPrint = (message, {wrapWidth}) => messages.add(message);
+    try {
+      final map = _Map();
+      widget.onMapCreated!(map);
+      await tester.pump();
+      for (final longitude in [107.38, 107.4512346]) {
+        widget.onCameraChangeListener!(
+          CameraChangedEventData.fromJson({
+            'timestamp': 0,
+            'cameraState': {
+              'center': {
+                'type': 'Point',
+                'coordinates': [longitude, 21.1234567],
+              },
+              'padding': {'top': 0, 'left': 0, 'bottom': 0, 'right': 0},
+              'zoom': 9.65,
+              'bearing': 17.25,
+              'pitch': 30.5,
+            },
+          }),
+        );
+      }
+      expect(messages, isEmpty);
+
+      widget.onMapIdleListener!(MapIdleEventData.fromJson({'timestamp': 1}));
+      expect(messages, [
+        '[MAP_CAMERA] longitude=107.451235, latitude=21.123457, '
+            'zoom=9.65, bearing=17.25, pitch=30.50',
+      ]);
+    } finally {
+      debugPrint = originalDebugPrint;
+    }
+  }, variant: TargetPlatformVariant({TargetPlatform.windows}));
+
   for (final earlyStyleEvent in [false, true]) {
     testWidgets(
       'recovers native style at creation (early event: $earlyStyleEvent)',
@@ -460,8 +626,11 @@ void main() {
         await _loadStyle(tester, widget);
         final pending = Completer<bool>();
         map.style.onLayerExists = (_) => pending.future;
+        final checksBeforeRequest = map.style.layerChecks;
         catalog.setLayerOpacity('1', 0.6);
         await tester.pump();
+        await tester.pump(const Duration(milliseconds: 1));
+        expect(map.style.layerChecks, greaterThan(checksBeforeRequest));
         catalog.setLayerOpacity('1', 0.4);
         await tester.pump();
         final checks = map.style.layerChecks;

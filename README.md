@@ -90,7 +90,13 @@ Truy cập [appstoreconnect.apple.com](https://appstoreconnect.apple.com) $\righ
 Sau mỗi lần sửa mã, chạy tại thư mục gốc dự án:
 
 ```powershell
-flutter build apk --flavor prod --release --target-platform android-arm64 --split-per-abi -t lib/main.dart --dart-define-from-file=.env --dart-define=ENABLE_TEST_LOGIN=true
+flutter build apk --flavor prod --release --build-number=2002 --target-platform android-arm64 --split-per-abi -t lib/main.dart --dart-define-from-file=.env --dart-define=ENABLE_TEST_LOGIN=true
 ```
 
 APK xuất ra tại: `build/app/outputs/flutter-apk/app-arm64-v8a-prod-release.apk`.
+Mã build `2002` tạo ARM64 `versionCode=4002` theo offset ABI hiện tại,
+đủ cài đè bản x86_64 cũ `4001`; tăng mã build khi phát hành bản mới.
+
+> Bản bật `ENABLE_TEST_LOGIN=true` chỉ dùng kiểm thử nội bộ: có thông tin đăng nhập mẫu trong APK.
+> Login nhanh vẫn xác thực qua API thật. Bản công khai phải tắt cờ này
+> (`--dart-define=ENABLE_TEST_LOGIN=false`; mặc định release cũng tắt).

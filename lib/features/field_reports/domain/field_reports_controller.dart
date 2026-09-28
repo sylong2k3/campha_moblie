@@ -1,10 +1,36 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/error/app_exception.dart';
 import '../../auth/domain/session_controller.dart';
 import '../../tools/domain/field_tools_models.dart';
 import '../data/field_report_repository.dart';
 import 'field_report_models.dart';
+
+typedef FieldReportAccess = ({
+  String? ownerId,
+  String? roleCode,
+  bool canRead,
+  bool canReview,
+  bool canStats,
+});
+
+final fieldReportAccessProvider = Provider<FieldReportAccess>((ref) {
+  final session = ref.watch(sessionControllerProvider);
+  final user =
+      session.isAuthenticated &&
+          session.user?.isActive == true &&
+          session.user?.mustChangePassword == false
+      ? session.user
+      : null;
+  return (
+    ownerId: user?.id,
+    roleCode: user?.roleCode,
+    canRead: user?.canReadFieldReports ?? false,
+    canReview: user?.canReviewFieldReports ?? false,
+    canStats: user?.canViewFieldReportStats ?? false,
+  );
+});
 
 class ReportFilter {
   const ReportFilter({
@@ -39,6 +65,8 @@ class ReportFilter {
 
 class FieldReportsState {
   const FieldReportsState({
+    this.admin = false,
+    this.mapMode = false,
     this.items = const [],
     this.nearbyItems = const [],
     this.filter = const ReportFilter(),
@@ -49,6 +77,8 @@ class FieldReportsState {
     this.stale = false,
     this.error,
   });
+  final bool admin;
+  final bool mapMode;
   final List<FieldReport> items;
   final List<FieldReport> nearbyItems;
   final ReportFilter filter;
@@ -61,6 +91,7 @@ class FieldReportsState {
   bool get hasMore => page < totalPages;
 
   FieldReportsState copyWith({
+    bool? mapMode,
     List<FieldReport>? items,
     List<FieldReport>? nearbyItems,
     ReportFilter? filter,
@@ -72,6 +103,8 @@ class FieldReportsState {
     Object? error,
     bool clearError = false,
   }) => FieldReportsState(
+    admin: admin,
+    mapMode: mapMode ?? this.mapMode,
     items: items ?? this.items,
     nearbyItems: nearbyItems ?? this.nearbyItems,
     filter: filter ?? this.filter,
@@ -86,6 +119,8 @@ class FieldReportsState {
 
 class FieldReportsController extends Notifier<FieldReportsState> {
   CancelToken? _cancelToken;
+  int _generation = 0;
+  bool _mapMode = false;
 
   void _safeCancel(String reason) {
     final t = _cancelToken;
@@ -94,19 +129,71 @@ class FieldReportsController extends Notifier<FieldReportsState> {
 
   @override
   FieldReportsState build() {
-    final ownerId = ref.watch(
-      sessionControllerProvider.select((session) => session.user?.id),
+    final access = ref.watch(
+      fieldReportAccessProvider.select((value) => value),
     );
-    ref.onDispose(() => _safeCancel('provider disposed'));
-    Future.microtask(() {
-      if (ownerId == ref.read(sessionControllerProvider).user?.id) {
-        loadFirstPage();
-      }
+    _safeCancel('access changed');
+    final generation = ++_generation;
+    ref.onDispose(() {
+      _generation++;
+      _safeCancel('provider disposed');
     });
-    return const FieldReportsState();
+    Future.microtask(() {
+      if (generation == _generation) loadFirstPage();
+    });
+    return FieldReportsState(admin: access.canRead, mapMode: _mapMode);
+  }
+
+  Future<void> setAdminView(bool admin) {
+    if (admin && !ref.read(fieldReportAccessProvider).canRead) {
+      throw const ForbiddenException();
+    }
+    if (state.admin == admin) return Future.value();
+    _safeCancel('report scope changed');
+    state = FieldReportsState(admin: admin, mapMode: _mapMode);
+    return loadFirstPage();
+  }
+
+  Future<void> setMapMode(bool mapMode) {
+    if (_mapMode == mapMode) return Future.value();
+    _mapMode = mapMode;
+    state = state.copyWith(mapMode: mapMode);
+    if (state.filter.nearbyLocation != null) return Future.value();
+    if (state.loading ||
+        state.appending ||
+        (mapMode && (state.hasMore || state.page == 0))) {
+      return loadFirstPage();
+    }
+    return Future.value();
+  }
+
+  Future<FieldReportPage> _getPage(
+    int page,
+    CancelToken token, {
+    int limit = 20,
+  }) {
+    final repository = ref.read(fieldReportRepositoryProvider);
+    return state.admin
+        ? repository.getAdmin(
+            status: state.filter.status,
+            page: page,
+            limit: limit,
+            cancelToken: token,
+          )
+        : repository.getPublic(
+            status: state.filter.status,
+            page: page,
+            limit: limit,
+            cancelToken: token,
+          );
   }
 
   Future<void> setStatus(String? status) {
+    if (status != null &&
+        (!fieldReportStatuses.contains(status) ||
+            (!state.admin && status != 'approved' && status != 'resolved'))) {
+      throw ArgumentError('Invalid report status filter');
+    }
     state = state.copyWith(
       filter: state.filter.copyWith(
         status: status,
@@ -123,6 +210,7 @@ class FieldReportsController extends Notifier<FieldReportsState> {
     required DateTime to,
     int radiusMeters = 100,
   }) async {
+    if (state.admin) throw const ForbiddenException();
     state = state.copyWith(
       filter: state.filter.copyWith(
         nearbyLocation: location,
@@ -148,9 +236,9 @@ class FieldReportsController extends Notifier<FieldReportsState> {
         state = state.copyWith(nearbyItems: items, loading: false);
       }
     } on DioException catch (error) {
-      if (!CancelToken.isCancel(error)) _setError(error);
+      if (!token.isCancelled) _setError(error);
     } catch (error) {
-      _setError(error);
+      if (!token.isCancelled) _setError(error);
     }
   }
 
@@ -164,6 +252,7 @@ class FieldReportsController extends Notifier<FieldReportsState> {
       stale: false,
       clearError: true,
     );
+    if (_mapMode) await loadFirstPage();
   }
 
   Future<void> refresh() {
@@ -180,34 +269,69 @@ class FieldReportsController extends Notifier<FieldReportsState> {
     );
   }
 
+  void applyReviewedReport(FieldReport report) {
+    if (!state.admin) return;
+    final status = state.filter.status;
+    state = state.copyWith(
+      items: [
+        for (final item in state.items)
+          if (item.id != report.id)
+            item
+          else if (status == null || status == report.status)
+            report,
+      ],
+    );
+  }
+
   void clearSensitiveState() {
     _safeCancel('session ended');
-    state = const FieldReportsState();
+    state = FieldReportsState(mapMode: _mapMode);
   }
 
   Future<void> loadFirstPage() async {
     final token = _replaceToken();
-    state = state.copyWith(loading: true, stale: false, clearError: true);
+    state = state.copyWith(
+      loading: true,
+      appending: false,
+      stale: false,
+      clearError: true,
+    );
     try {
-      final result = await ref
-          .read(fieldReportRepositoryProvider)
-          .getPublic(status: state.filter.status, page: 1, cancelToken: token);
-      if (token.isCancelled) return;
+      final limit = _mapMode ? 100 : 20;
+      var page = 1;
+      final items = <String, FieldReport>{};
+      late FieldReportPage result;
+      // ponytail: API caps pages at 100; batch markers once, use server tiles
+      // if the full report dataset outgrows device memory.
+      do {
+        result = await _getPage(page, token, limit: limit);
+        if (token.isCancelled) return;
+        if (result.page != page || (result.hasMore && result.items.isEmpty)) {
+          throw const FormatException('Invalid field report pagination');
+        }
+        for (final report in result.items) {
+          items[report.id] = report;
+        }
+        page++;
+      } while (_mapMode && result.hasMore);
       state = FieldReportsState(
-        items: result.items,
+        admin: state.admin,
+        mapMode: _mapMode,
+        items: items.values.toList(growable: false),
         filter: state.filter,
         page: result.page,
         totalPages: result.totalPages,
       );
     } on DioException catch (error) {
-      if (!CancelToken.isCancel(error)) _setError(error);
+      if (!token.isCancelled) _setError(error);
     } catch (error) {
-      _setError(error);
+      if (!token.isCancelled) _setError(error);
     }
   }
 
   Future<void> loadMore() async {
-    if (state.filter.nearbyLocation != null ||
+    if (_mapMode ||
+        state.filter.nearbyLocation != null ||
         state.loading ||
         state.appending ||
         !state.hasMore) {
@@ -216,13 +340,7 @@ class FieldReportsController extends Notifier<FieldReportsState> {
     final token = _replaceToken();
     state = state.copyWith(appending: true, clearError: true);
     try {
-      final result = await ref
-          .read(fieldReportRepositoryProvider)
-          .getPublic(
-            status: state.filter.status,
-            page: state.page + 1,
-            cancelToken: token,
-          );
+      final result = await _getPage(state.page + 1, token);
       if (token.isCancelled) return;
       state = state.copyWith(
         items: [...state.items, ...result.items],
@@ -231,11 +349,9 @@ class FieldReportsController extends Notifier<FieldReportsState> {
         appending: false,
       );
     } on DioException catch (error) {
-      if (!CancelToken.isCancel(error)) {
-        state = state.copyWith(appending: false, error: error);
-      }
+      if (!token.isCancelled) _setError(error);
     } catch (error) {
-      state = state.copyWith(appending: false, error: error);
+      if (!token.isCancelled) _setError(error);
     }
   }
 
@@ -245,6 +361,20 @@ class FieldReportsController extends Notifier<FieldReportsState> {
   }
 
   void _setError(Object error) {
+    final status = error is DioException
+        ? error.response?.statusCode
+        : error is AppException
+        ? error.statusCode
+        : null;
+    if (state.admin && (status == 401 || status == 403)) {
+      state = FieldReportsState(
+        admin: true,
+        mapMode: _mapMode,
+        filter: state.filter,
+        error: error,
+      );
+      return;
+    }
     state = state.copyWith(
       loading: false,
       appending: false,

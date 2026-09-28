@@ -400,10 +400,7 @@ const _testAccountPassword = String.fromEnvironment(
   'TEST_ACCOUNT_PASSWORD',
   defaultValue: _defaultDemoPassword,
 );
-const _testLoginEnabled = bool.fromEnvironment(
-  'ENABLE_TEST_LOGIN',
-  defaultValue: true,
-);
+const _testLoginEnabled = bool.fromEnvironment('ENABLE_TEST_LOGIN');
 
 class _TestAccount {
   const _TestAccount({
@@ -525,7 +522,7 @@ class _TestAccountsStrip extends StatelessWidget {
               Expanded(
                 child: Text(
                   passwordConfigured
-                      ? 'Mật khẩu mẫu: $_defaultDemoPassword (chạm vai trò để đăng nhập ngay)'
+                      ? 'Bản kiểm thử nội bộ · chạm vai trò để đăng nhập ngay.'
                       : 'Chạm để tự động điền email vai trò kiểm thử.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: colors.onSurfaceVariant,

@@ -11,6 +11,8 @@ import '../../shared/presentation/app_feedback.dart';
 import '../data/field_report_repository.dart';
 import '../domain/field_report_models.dart';
 import '../domain/field_reports_controller.dart';
+import 'admin_report_sheets.dart';
+import 'report_status.dart';
 
 class MyReportsScreen extends ConsumerWidget {
   const MyReportsScreen({super.key});
@@ -193,16 +195,35 @@ class _MineStatusFilters extends ConsumerWidget {
   }
 }
 
-class FieldReportDetailScreen extends ConsumerStatefulWidget {
+class FieldReportDetailScreen extends ConsumerWidget {
   const FieldReportDetailScreen({super.key, required this.reportId});
   final String reportId;
+
   @override
-  ConsumerState<FieldReportDetailScreen> createState() =>
+  Widget build(BuildContext context, WidgetRef ref) {
+    final access = ref.watch(fieldReportAccessProvider);
+    if (access.canRead) {
+      return Scaffold(
+        body: AdminReportSheet(
+          key: ValueKey((access, reportId)),
+          reportId: reportId,
+        ),
+      );
+    }
+    return _OwnReportDetailScreen(key: ValueKey(access), reportId: reportId);
+  }
+}
+
+class _OwnReportDetailScreen extends ConsumerStatefulWidget {
+  const _OwnReportDetailScreen({super.key, required this.reportId});
+  final String reportId;
+  @override
+  ConsumerState<_OwnReportDetailScreen> createState() =>
       _FieldReportDetailScreenState();
 }
 
 class _FieldReportDetailScreenState
-    extends ConsumerState<FieldReportDetailScreen> {
+    extends ConsumerState<_OwnReportDetailScreen> {
   late Future<FieldReport> _future;
   @override
   void initState() {
@@ -285,7 +306,7 @@ class _FieldReportDetailScreenState
                   report.referenceCode,
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
-                Chip(label: Text(_status(context, report.status))),
+                ReportStatusBadge(status: report.status),
               ],
             ),
             const SizedBox(height: 18),
@@ -380,12 +401,15 @@ class _FieldReportDetailScreenState
                     ),
             ),
             const SizedBox(height: 24),
-            OutlinedButton.icon(
-              key: const ValueKey('report-detail-delete'),
-              onPressed: () => _delete(report),
-              icon: const Icon(Icons.delete_outline),
-              label: Text(context.l10n.reportDelete),
-            ),
+            if (report.senderUserId ==
+                    ref.watch(fieldReportAccessProvider).ownerId &&
+                report.senderUserId != null)
+              OutlinedButton.icon(
+                key: const ValueKey('report-detail-delete'),
+                onPressed: () => _delete(report),
+                icon: const Icon(Icons.delete_outline),
+                label: Text(context.l10n.reportDelete),
+              ),
           ],
         );
       },

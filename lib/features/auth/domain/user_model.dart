@@ -67,7 +67,25 @@ class UserModel {
         : '${firstRune(words.first)}${firstRune(words.last)}'.toUpperCase();
   }
 
+  bool get isSystemAdmin => roleCode == 'system_admin';
+
+  bool get canEditMapFeatures =>
+      (isSystemAdmin || isTnmtAdmin) && hasPermission('map_feature', 'update');
+
+  bool get isFieldReportManager =>
+      const {'ubnd_tp', 'so_tnmt', 'so_xd', 'system_admin'}.contains(roleCode);
+
+  bool get canReadFieldReports =>
+      isFieldReportManager && hasPermission('field_report', 'read');
+  bool get canReviewFieldReports =>
+      canReadFieldReports && hasPermission('field_report', 'approve');
+  bool get canViewFieldReportStats =>
+      canReadFieldReports && hasPermission('field_report', 'stats');
+
   bool hasPermission(String resource, String action) {
+    if (!isActive) return false;
+    // Client capability only; the server still authorizes every request.
+    if (isSystemAdmin) return true;
     final resourceValue = permissions[resource];
     if (resourceValue is Map) return resourceValue[action] == true;
     if (resourceValue is List) return resourceValue.contains(action);

@@ -28,7 +28,7 @@ class FieldReportRepository {
       queryParameters: {'page': page, 'limit': limit, 'status': ?status},
       cancelToken: cancelToken,
     );
-    return FieldReportPage.fromEnvelope(_body(response));
+    return FieldReportPage.fromEnvelope(_body(response), publicOnly: true);
   }
 
   Future<List<FieldReport>> getNearby({
@@ -55,7 +55,88 @@ class FieldReportRepository {
     final raw = _body(response)['data'];
     if (raw is! List) throw const FormatException('data is not a list');
     return raw
-        .map((item) => FieldReport.fromJson(_map(item, 'data[]')))
+        .map((item) => FieldReport.fromPublicJson(_map(item, 'data[]')))
+        .toList(growable: false);
+  }
+
+  Future<FieldReportPage> getAdmin({
+    String? status,
+    int page = 1,
+    int limit = 20,
+    CancelToken? cancelToken,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      ApiEndpoints.adminFieldReports,
+      queryParameters: {'page': page, 'limit': limit, 'status': ?status},
+      cancelToken: cancelToken,
+    );
+    return FieldReportPage.fromEnvelope(_body(response));
+  }
+
+  Future<FieldReport> getAdminDetail(
+    String id, {
+    CancelToken? cancelToken,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      ApiEndpoints.adminFieldReportDetail(id),
+      cancelToken: cancelToken,
+    );
+    return FieldReport.fromJson(_map(_body(response)['data'], 'data'));
+  }
+
+  Future<FieldReport> review(
+    FieldReport report, {
+    required String status,
+    String? reason,
+    CancelToken? cancelToken,
+  }) async {
+    final trimmed = reason?.trim() ?? '';
+    if (!report.reviewTransitions.contains(status) ||
+        (status == 'rejected' && trimmed.isEmpty) ||
+        (trimmed.isNotEmpty && (trimmed.length < 5 || trimmed.length > 1000))) {
+      throw ArgumentError('Invalid field report review');
+    }
+    final response = await _dio.patch<Map<String, dynamic>>(
+      ApiEndpoints.adminFieldReportReview(report.id),
+      data: {
+        'status': status,
+        if (trimmed.isNotEmpty) 'reason': trimmed,
+        'expectedUpdatedAt': report.updatedAt.toUtc().toIso8601String(),
+      },
+      cancelToken: cancelToken,
+    );
+    return FieldReport.fromJson(_map(_body(response)['data'], 'data'));
+  }
+
+  Future<List<FieldReportCluster>> getClusters({
+    required DateTime from,
+    required DateTime to,
+    required int radiusMeters,
+    int minReporters = 2,
+    CancelToken? cancelToken,
+  }) async {
+    if (!to.isAfter(from) ||
+        to.difference(from) > const Duration(days: 366) ||
+        radiusMeters < 10 ||
+        radiusMeters > 500 ||
+        minReporters < 2 ||
+        minReporters > 20) {
+      throw ArgumentError('Invalid cluster filter');
+    }
+    final response = await _dio.get<Map<String, dynamic>>(
+      ApiEndpoints.adminFieldReportClusters,
+      queryParameters: {
+        'from': from.toUtc().toIso8601String(),
+        'to': to.toUtc().toIso8601String(),
+        'radiusMeters': radiusMeters,
+        'minReporters': minReporters,
+      },
+      cancelToken: cancelToken,
+    );
+    final raw = _body(response)['data'];
+    if (raw is! List) throw const FormatException('data is not a list');
+    return raw
+        .map((item) => FieldReportCluster.fromJson(_map(item, 'data[]')))
         .toList(growable: false);
   }
 
@@ -84,10 +165,10 @@ class FieldReportRepository {
       final status = error.response?.statusCode;
       if (status == 404 || status == 401 || status == 403) {
         final publicResponse = await _dio.get<Map<String, dynamic>>(
-          '${ApiEndpoints.fieldReportsPublic}/$id',
+          ApiEndpoints.fieldReportPublicDetail(id),
           cancelToken: cancelToken,
         );
-        return FieldReport.fromJson(
+        return FieldReport.fromPublicJson(
           _map(_body(publicResponse)['data'], 'data'),
         );
       }

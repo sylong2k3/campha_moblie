@@ -438,7 +438,10 @@ void main() {
   Future<void> pumpSheet(WidgetTester tester, Widget sheet) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [mapRepositoryProvider.overrideWithValue(Repository())],
+        overrides: [
+          mapRepositoryProvider.overrideWithValue(Repository()),
+          mapCatalogProvider.overrideWith(EmptyCatalog.new),
+        ],
         child: MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,

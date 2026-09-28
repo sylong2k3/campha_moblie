@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:campha_moblie/features/auth/domain/session_controller.dart';
+import 'package:campha_moblie/features/auth/domain/user_model.dart';
 import 'package:campha_moblie/features/map/data/map_repository.dart';
 import 'package:campha_moblie/features/map/domain/layer_model.dart';
 import 'package:campha_moblie/features/map/domain/map_controller.dart';
@@ -7,35 +9,51 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-LayerModel _layer(String id, {bool enabled = false}) => LayerModel(
-  id: id,
-  code: 'ranh_gioi_$id',
-  nameVi: 'Ranh giới $id',
-  category: 'ranh_gioi',
-  geometryType: 'LINESTRING',
-  storageKind: 'postgis',
-  srid: 4326,
-  isPublic: true,
-  legend: const {},
-  isEnableDefault: enabled,
-);
+LayerModel _layer(String id, {bool enabled = false, bool isPublic = true}) =>
+    LayerModel(
+      id: id,
+      code: 'ranh_gioi_$id',
+      nameVi: 'Ranh giới $id',
+      category: 'ranh_gioi',
+      geometryType: 'LINESTRING',
+      storageKind: 'postgis',
+      srid: 4326,
+      isPublic: isPublic,
+      legend: const {},
+      isEnableDefault: enabled,
+    );
 
 class _Repository extends MapRepository {
   _Repository(this.layers) : super(dio: Dio());
   List<LayerModel> layers;
   Future<List<LayerModel>> Function()? request;
+  int requests = 0;
 
   @override
-  Future<List<LayerModel>> getLayers({String? category}) async =>
-      request == null ? layers : request!();
+  Future<List<LayerModel>> getLayers({String? category}) async {
+    requests++;
+    return request == null ? layers : request!();
+  }
 
   @override
   Future<List<BasemapModel>> getBasemaps() async => [];
 }
 
+class _Session extends SessionController {
+  @override
+  SessionState build() => const SessionState.guest();
+
+  void authenticate(String id) => state = SessionState.authenticated(
+    UserModel.fromJson({'id': id, 'email': 'user@example.com'}),
+  );
+}
+
 Future<ProviderContainer> _catalog(_Repository repository) async {
   final container = ProviderContainer(
-    overrides: [mapRepositoryProvider.overrideWithValue(repository)],
+    overrides: [
+      mapRepositoryProvider.overrideWithValue(repository),
+      sessionControllerProvider.overrideWith(_Session.new),
+    ],
   );
   addTearDown(() {
     container.dispose();
@@ -47,6 +65,53 @@ Future<ProviderContainer> _catalog(_Repository repository) async {
 }
 
 void main() {
+  test(
+    'identity refresh keeps public map state and drops private layers immediately',
+    () async {
+      final repository = _Repository([
+        _layer('1', enabled: true),
+        _layer('2', enabled: true, isPublic: false),
+      ]);
+      final container = await _catalog(repository);
+      final controller = container.read(mapCatalogProvider.notifier);
+      final selectedBasemap = container
+          .read(mapCatalogProvider)
+          .basemaps
+          .last
+          .code;
+      controller.selectBasemap(selectedBasemap);
+      controller.setLayerOpacity('1', 0.4);
+      controller.setLayerOpacity('2', 0.6);
+      final pending = Completer<List<LayerModel>>();
+      repository.request = () => pending.future;
+      final session =
+          container.read(sessionControllerProvider.notifier) as _Session;
+      final before = repository.requests;
+      session.authenticate('1');
+      final changing = container.read(mapCatalogProvider);
+      expect(changing.layers.map((layer) => layer.id), ['1']);
+      expect(changing.activeLayerIds, {'1'});
+      expect(changing.opacityByLayer, {'1': 0.4});
+      expect(changing.selectedBasemapCode, selectedBasemap);
+      await Future<void>.delayed(Duration.zero);
+      expect(repository.requests, before + 1);
+      pending.complete([_layer('1', enabled: true)]);
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(mapCatalogProvider.notifier), same(controller));
+      expect(
+        container.read(mapCatalogProvider).selectedBasemapCode,
+        selectedBasemap,
+      );
+      session.authenticate('1'); // Same identity refresh must not reload tiles.
+      await Future<void>.delayed(Duration.zero);
+      expect(repository.requests, before + 1);
+      session.continueAsGuest();
+      await Future<void>.delayed(Duration.zero);
+      expect(repository.requests, before + 2);
+      expect(container.read(mapCatalogProvider).opacityOf('1'), 0.4);
+    },
+  );
+
   test('only API-enabled layers activate on first load', () async {
     final container = await _catalog(
       _Repository([_layer('1', enabled: true), _layer('2')]),

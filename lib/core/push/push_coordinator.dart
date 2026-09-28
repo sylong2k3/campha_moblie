@@ -7,6 +7,7 @@ import '../../app/router/app_router.dart';
 import '../../app/router/route_names.dart';
 import '../../features/auth/domain/session_controller.dart';
 import '../../features/field_reports/data/field_report_repository.dart';
+import '../../features/field_reports/domain/field_reports_controller.dart';
 import '../../features/notifications/data/notification_model.dart';
 import '../../features/notifications/domain/notification_controller.dart';
 import 'push_service.dart';
@@ -22,6 +23,13 @@ final appPushCoordinatorProvider = Provider<PushService>((ref) {
       unawaited(
         ref.read(notificationListControllerProvider.notifier).refresh(),
       );
+    }
+  }
+
+  void refreshReports() {
+    if (disposed || !ref.read(fieldReportAccessProvider).canRead) return;
+    if (ref.exists(fieldReportsProvider)) {
+      unawaited(ref.read(fieldReportsProvider.notifier).refresh());
     }
   }
 
@@ -46,7 +54,10 @@ final appPushCoordinatorProvider = Provider<PushService>((ref) {
       return session.isAuthenticated ? session : null;
     },
     onMessageTap: openMessage,
-    onForegroundMessage: (_) => refreshNotifications(),
+    onForegroundMessage: (data) {
+      refreshNotifications();
+      if (notificationReportId(data) != null) refreshReports();
+    },
   );
   unawaited(service.attach());
 
@@ -70,6 +81,7 @@ final appPushCoordinatorProvider = Provider<PushService>((ref) {
       if (ref.read(sessionControllerProvider).isAuthenticated) {
         unawaited(register());
         refreshNotifications();
+        refreshReports();
       }
     },
   );

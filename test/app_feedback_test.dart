@@ -526,32 +526,43 @@ void main() {
     expect(passwordEditor.focusNode.hasFocus, isTrue);
   });
 
-  testWidgets('configured debug role button submits login immediately', (
-    tester,
-  ) async {
-    final repository = _CapturingAuthRepository();
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authRepositoryProvider.overrideWithValue(repository),
-          tokenStorageProvider.overrideWithValue(repository.tokenStorage),
-        ],
-        child: const _LocalizedApp(
-          home: LoginScreen(debugTestAccountPassword: 'demo-password'),
+  for (final (role, email) in [
+    ('citizen', 'citizen@campha.gov.vn'),
+    ('ubnd_tp', 'ubnd@campha.gov.vn'),
+    ('so_xd', 'xaydung@campha.gov.vn'),
+    ('so_tnmt', 'tnmt@campha.gov.vn'),
+    ('system_admin', 'admin@campha.gov.vn'),
+  ]) {
+    testWidgets('quick login submits $role with configured credentials', (
+      tester,
+    ) async {
+      final repository = _CapturingAuthRepository();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authRepositoryProvider.overrideWithValue(repository),
+            tokenStorageProvider.overrideWithValue(repository.tokenStorage),
+          ],
+          child: const _LocalizedApp(
+            home: LoginScreen(debugTestAccountPassword: 'demo-password'),
+          ),
         ),
-      ),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    final citizenAccount = find.byKey(const ValueKey('test-account-citizen'));
-    await tester.ensureVisible(citizenAccount);
-    await tester.tap(citizenAccount);
-    await tester.pump();
+      final account = find.byKey(ValueKey('test-account-$role'));
+      await tester.ensureVisible(account);
+      await tester.tap(account);
+      await tester.pump();
 
-    expect(repository.loginCalls, 1);
-    expect(repository.email, 'citizen@campha.gov.vn');
-    expect(repository.password, 'demo-password');
-  });
+      expect(repository.loginCalls, 1);
+      expect(repository.email, email);
+      expect(repository.password, 'demo-password');
+      expect(find.textContaining('Mật khẩu mẫu:'), findsNothing);
+      expect(find.textContaining('Bản kiểm thử nội bộ'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('invalid login focuses first invalid field in visual order', (
     tester,

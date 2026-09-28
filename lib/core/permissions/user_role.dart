@@ -1,5 +1,5 @@
-/// Vai trò backend hiện hành. Permission payload từ `/auth/me` vẫn là nguồn
-/// quyết định cuối; enum chỉ phục vụ nhãn và fallback UI bảo thủ.
+/// Vai trò backend hiện hành; enum phục vụ nhãn và fallback UI bảo thủ.
+/// UserModel tính capability phía ứng dụng; backend quyết định quyền thực thi.
 enum UserRole {
   guest,
   citizen,
