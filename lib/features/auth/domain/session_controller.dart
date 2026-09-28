@@ -243,6 +243,8 @@ class SessionController extends Notifier<SessionState> {
     } catch (_) {
       // Draft metadata/media cleanup must not block logout.
     }
+    // Reports already clear private state and reload when access changes.
+    // Clearing them after awaited cleanup would cancel that public reload.
     for (final cleanup in <void Function()>[
       () => ref.invalidate(reportComposerProvider),
       () => ref.invalidate(myReportsProvider),
@@ -251,7 +253,6 @@ class SessionController extends Notifier<SessionState> {
       () => ref.invalidate(pdfMapListProvider),
       () => ref.invalidate(notificationListControllerProvider),
       () => ref.invalidate(unreadNotificationCountProvider),
-      () => ref.read(fieldReportsProvider.notifier).clearSensitiveState(),
       () => ref.read(fieldToolsProvider.notifier).clearSensitiveState(),
     ]) {
       try {

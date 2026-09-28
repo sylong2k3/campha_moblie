@@ -283,11 +283,6 @@ class FieldReportsController extends Notifier<FieldReportsState> {
     );
   }
 
-  void clearSensitiveState() {
-    _safeCancel('session ended');
-    state = FieldReportsState(mapMode: _mapMode);
-  }
-
   Future<void> loadFirstPage() async {
     final token = _replaceToken();
     state = state.copyWith(
